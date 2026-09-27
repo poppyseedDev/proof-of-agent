@@ -55,7 +55,8 @@ export function Certificate({
   tx?: TxState;
   onOpen: (lamports: number, durationSecs: number) => void;
 }) {
-  const [amount, setAmount] = useState("1");
+  // Half of what the devnet faucet sends, so a new tester can allocate straight away.
+  const [amount, setAmount] = useState("0.1");
   const [picked, setPicked] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
   const { publicKey } = useWallet();
