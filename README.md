@@ -73,9 +73,11 @@ program through the same TypeScript client the frontend uses (real RPC,
 airdrops, PDAs, IDL decoding). The last localnet test waits out a real
 60-second deadline to exercise the default claim.
 
-On localnet the wallet picker also offers **Burner Wallet**, an in-memory
-keypair for quick testing, and the header shows an **Airdrop 10 SOL** button.
-The burner key lives only in the page, so a full reload gives you a new wallet.
+On devnet and localnet the wallet picker also offers **Test wallet**, a keypair
+kept in the browser's localStorage (one per cluster, never on mainnet), so
+testers need no wallet extension and keep the same wallet across reloads.
+Clearing site data loses it. On localnet the header shows an **Airdrop 10 SOL**
+button.
 
 To use Phantom instead: Settings → Developer settings → enable Testnet mode and
 pick **Localnet**, otherwise Phantom simulates against devnet and reports

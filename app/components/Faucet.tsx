@@ -17,13 +17,35 @@ export function Faucet({ compact = false }: { compact?: boolean }) {
   const [state, setState] = useState<"idle" | "busy" | "done" | "err">("idle");
   const [msg, setMsg] = useState("");
   const [enabled, setEnabled] = useState(CLUSTER === "localnet");
+  // Devnet only: our faucet is off, unreachable or out of SOL, so point to the public one instead.
+  const [empty, setEmpty] = useState(false);
 
   useEffect(() => {
     if (CLUSTER !== "devnet") return;
-    fetch("/api/faucet").then((r) => r.json()).then((d) => setEnabled(!!d.enabled)).catch(() => setEnabled(false));
+    fetch("/api/faucet")
+      .then((r) => r.json())
+      .then((d) => {
+        const on = !!d.enabled && d.remainingDrops !== 0;
+        setEnabled(on);
+        setEmpty(!on);
+      })
+      .catch(() => {
+        setEnabled(false);
+        setEmpty(true);
+      });
   }, []);
 
-  if (!publicKey || !enabled) return null;
+  if (!publicKey) return null;
+  if (!enabled) {
+    if (!empty) return null;
+    return (
+      <a className={"btn ghost sm faucet" + (compact ? "" : " wide")} href="https://faucet.solana.com" target="_blank" rel="noreferrer"
+        title={`Our faucet is empty. Paste ${publicKey.toBase58()} at faucet.solana.com and pick Devnet.`}>
+        <IconDrop width={14} height={14} />
+        <span className="faucet-label">Get test SOL at faucet.solana.com</span>
+      </a>
+    );
+  }
 
   const drop = async () => {
     setState("busy");

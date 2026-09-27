@@ -6,8 +6,8 @@ import {
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { UnsafeBurnerWalletAdapter } from "@solana/wallet-adapter-unsafe-burner";
 import { CLUSTER, RPC_URL } from "@/lib/program";
+import { TestWalletAdapter } from "@/lib/testWallet";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -18,11 +18,8 @@ export function Providers({ children }: { children: ReactNode }) {
     console.warn("wallet:", e.message);
   }, []);
   // Wallet-standard wallets (Phantom, Solflare, Backpack…) register themselves.
-  // On localnet we also offer an in-memory burner wallet for quick testing.
-  const wallets = useMemo(
-    () => (CLUSTER === "localnet" ? [new UnsafeBurnerWalletAdapter()] : []),
-    [],
-  );
+  // On test networks we also offer a no-install test wallet kept in this browser.
+  const wallets = useMemo(() => (CLUSTER === "mainnet-beta" ? [] : [new TestWalletAdapter(CLUSTER)]), []);
   return (
     <ConnectionProvider endpoint={RPC_URL} config={{ commitment: "confirmed" }}>
       <WalletProvider wallets={wallets} autoConnect onError={onWalletError}>
