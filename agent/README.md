@@ -99,7 +99,13 @@ Three layers keep settlement alive:
    `WATCHDOG_SECS`, which covers a hung RPC call or a dead connection pool.
 3. An uptime monitor checks the site heartbeat and emails you when the runner
    is offline. This is the only layer that notices the whole machine being down.
-4. `.github/workflows/runner-watchdog.yml` does the same check as a backup.
+4. `scripts/uptime-check.sh`, run every 5 minutes on the Mac by launchd
+   (`dev.proofofagent.uptime`, installed copy in
+   `~/Library/Application Support/ProofOfAgent/`), checks the heartbeat, both
+   sites and the faucet balance. It logs problems and recoveries to `uptime.log`
+   there and shows a notification when the state changes. Only while the Mac is
+   awake; re-copy the script after editing it.
+5. `.github/workflows/runner-watchdog.yml` does the same check as a backup.
    GitHub runs schedules best-effort (often late, sometimes skipped), so don't
    rely on it alone.
 
