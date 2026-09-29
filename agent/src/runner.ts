@@ -1,12 +1,16 @@
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { AGENTS, POLL_MS, WATCHDOG_SECS } from "./config.js";
 import { initOrca, mainPrice } from "./orca.js";
 import { AgentRunner, glog, heartbeatNote, msg, refreshClock, tickAll } from "./agent.js";
+import { IDL } from "./chain.js";
 import { acquireLock } from "./lock.js";
 import { stateDir } from "./state.js";
 
 const HEARTBEAT_URL = process.env.HEARTBEAT_URL ?? "https://dev.proofofagent.dev/api/heartbeat";
 const HEARTBEAT_SECRET = process.env.HEARTBEAT_SECRET;
+/** Fingerprint of the program interface this runner was built with; the same formula as idlHash in app/lib/liveCheck.ts. */
+const IDL_HASH = createHash("sha256").update(JSON.stringify(IDL)).digest("hex").slice(0, 12);
 
 /** Tells the site the runner is alive so testers can see whether agents are online. */
 async function heartbeat(agents: string[], note?: string) {
@@ -15,7 +19,7 @@ async function heartbeat(agents: string[], note?: string) {
     await fetch(HEARTBEAT_URL, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${HEARTBEAT_SECRET}` },
-      body: JSON.stringify({ agents, note }),
+      body: JSON.stringify({ agents, note, idl: IDL_HASH }),
       signal: AbortSignal.timeout(8000),
     });
   } catch (e) {
@@ -29,6 +33,7 @@ async function main() {
   const release = acquireLock(`${stateDir}runner.lock`, undefined, glog);
   process.on("exit", release); // clean stop, watchdog exit, or a fatal error
 
+  glog(`program interface ${IDL_HASH}`);
   await initOrca();
   const only = process.argv.slice(2);
   const runners = AGENTS.filter((a) => !only.length || only.includes(a.id)).map((a) => new AgentRunner(a));

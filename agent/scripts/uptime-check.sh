@@ -3,7 +3,8 @@
 # (dev.proofofagent.uptime) from ~/Library/Application Support/ProofOfAgent,
 # because macOS blocks background jobs from reading the Desktop.
 #
-# Checks the agent runner heartbeat, both sites, and the faucet balance.
+# Checks the agent runner heartbeat, both sites, the faucet balance, and whether
+# the site can trade against the deployed program (/api/health).
 # Logs every failing check and every recovery to uptime.log, and shows a
 # macOS notification when the overall state changes. Nothing is logged while
 # all is well, apart from one "ok" line a day so you can see it is running.
@@ -38,9 +39,9 @@ else
   summary="$(print -r -- "$beat" | /usr/bin/python3 -c '
 import json, sys
 b = json.load(sys.stdin)
-print("online" if b.get("online") else "offline", b.get("ageSec"), len(b.get("agents") or []))
+print("online" if b.get("online") else "offline", b.get("ageSec"), len(b.get("agents") or []), b.get("idl") or "-")
 ' 2>/dev/null)"
-  read -r online age agents <<< "$summary"
+  read -r online age agents runner_idl <<< "$summary"
   if [ "$online" != "online" ]; then
     problems+=("runner offline (last heartbeat ${age:-never}s ago)")
   elif [ "${agents:-0}" -lt "$AGENTS_EXPECTED" ]; then
@@ -52,6 +53,24 @@ for url in https://dev.proofofagent.dev/ https://proofofagent.dev/; do
   code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "$url")"
   [ "$code" = "200" ] || problems+=("$url returned $code")
 done
+
+# Answers 503 when the site cannot trade, so read the body whatever the status.
+health="$(curl -sS --max-time 30 https://dev.proofofagent.dev/api/health 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+h = json.load(sys.stdin)
+print(h.get("status") or "-", h.get("idlHash") or "-", h.get("reason") or "")
+' 2>/dev/null)"
+read -r trading site_idl why <<< "$health"
+case "${trading:-}" in
+  ok|unknown) ;;
+  broken) problems+=("the site cannot trade: $why") ;;
+  blocked) problems+=("trading is blocked: $why") ;;
+  *) problems+=("health check unreachable") ;;
+esac
+# Both are built from the same IDL; a difference means one of them was not redeployed.
+if [ "${runner_idl:--}" != "-" ] && [ "${site_idl:--}" != "-" ] && [ "$runner_idl" != "$site_idl" ]; then
+  problems+=("runner and site use different program interfaces (runner $runner_idl, site $site_idl): redeploy the older one")
+fi
 
 drops="$(get https://dev.proofofagent.dev/api/faucet | /usr/bin/python3 -c '
 import json, sys

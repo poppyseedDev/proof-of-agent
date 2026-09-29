@@ -84,18 +84,24 @@ pick **Localnet**, otherwise Phantom simulates against devnet and reports
 "not enough SOL". Then connect on http://localhost:3000.
 
 After changing the program: `anchor build && anchor deploy --provider.cluster localnet`
-and copy the IDL: `cp target/idl/proof_of_agent.json app/lib/idl.json`.
+and copy the IDL: `cp target/idl/proof_of_agent.json app/lib/idl.json` and to
+`sdk/idl/`. Then run `npm test` in `app/`: it fails if the new IDL would not work
+against the program on devnet.
 
 ## Devnet
 
 The program is deployed on devnet with room for upgrades up to 320 KB. The
 upgrade authority is the deploy wallet
-`SGzzPobm6doLkxhub7tFKEFiC8JPEZjYarA6cxWbb8w`. To upgrade:
+`SGzzPobm6doLkxhub7tFKEFiC8JPEZjYarA6cxWbb8w`. To upgrade, first make sure the
+clients are ready (see "Deploying without breaking trading"):
 
 ```bash
 anchor build
+npm run check:upgrade      # must say "Safe to upgrade"
 solana program deploy target/deploy/proof_of_agent.so \
   --program-id target/deploy/proof_of_agent-keypair.json -u devnet
+npm run check:live         # must say OK
+cp target/idl/proof_of_agent.json app/lib/deployed/devnet.json
 ```
 
 After deploying a program version that has the protocol config for the first
@@ -171,6 +177,37 @@ never cost an operator its bond. What costs money is publishing a floor tighter
 than the strategy can hold. See [sim/README.md](sim/README.md) for the tables
 and [docs/settlement.md](docs/settlement.md) for how that follows from the
 settlement rule.
+
+## Deploying without breaking trading
+
+The site, the agent runner and the SDK are deployed separately from the program,
+so for a while new clients talk to the old program. Four guards keep that safe:
+
+| Guard | When it runs | What it catches |
+|-------|--------------|-----------------|
+| `npm test` in `app/` compares `app/lib/idl.json` with `app/lib/deployed/devnet.json`, the IDL of the program on devnet | Every test run | A change the deployed program cannot read: a reordered or removed account, changed arguments, a changed account layout |
+| `npm run check:live` simulates a whole agent and position lifecycle against the program on devnet, built from this checkout's IDL. It signs and sends nothing and needs no key | Before every deploy | Anything that makes an instruction fail on the real program |
+| `/api/health` on the site runs the same simulation from the IDL the site was built with | After every deploy, then every 5 minutes from the Mac's uptime check and the GitHub watchdog | A site that cannot trade, whatever the cause, including a program upgrade that left the site behind |
+| The runner reports the fingerprint of its IDL in its heartbeat | Every tick | A runner that was not redeployed after the interface changed |
+
+Rules for changing the program:
+
+- Add new accounts at the **end** of an instruction's account list. A program ignores
+  extra accounts after the ones it expects, so new clients keep working with the old
+  program. Anywhere else, every instruction that has the account fails.
+- Never change the layout of `Agent` or `Position`, the arguments of an
+  instruction, or an error code. Add new ones instead.
+
+Deploy in this order:
+
+```bash
+npm run deploy:site        # tests, live check, vercel --prod, then waits for /api/health to say ok
+fly deploy . --config agent/fly.toml --ha=false
+npm run check:upgrade      # says whether the site and the runner are ready for the new program
+# then the program, with the steps check:upgrade prints
+```
+
+Deploy the site with `npm run deploy:site` only, never with `vercel --prod` directly.
 
 ## Pause switch and caps
 

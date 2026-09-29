@@ -9,6 +9,9 @@
     "seed": "tsx scripts/seed.ts",
     "fund": "tsx scripts/seed.ts fund",
     "config": "tsx scripts/config.ts",
+    "check:live": "tsx scripts/check-live.ts",
+    "check:upgrade": "tsx scripts/check-upgrade.ts",
+    "deploy:site": "zsh scripts/deploy-site.sh",
     "test": "tsx --test tests/unit/*.test.ts",
     "test:localnet": "tsx --test tests/localnet.test.ts"
   },

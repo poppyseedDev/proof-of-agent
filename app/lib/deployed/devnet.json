@@ -1,0 +1,2190 @@
+{
+  "address": "49aHwbzdT1iN8WYWdUZxrGoZpjSryyugMm4q9VTjXgSr",
+  "metadata": {
+    "name": "proof_of_agent",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_position",
+      "discriminator": [
+        238,
+        238,
+        23,
+        104,
+        199,
+        77,
+        104,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "trader",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_default",
+      "discriminator": [
+        12,
+        132,
+        209,
+        37,
+        163,
+        22,
+        128,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "trader",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_agent",
+      "discriminator": [
+        143,
+        66,
+        198,
+        95,
+        110,
+        85,
+        83,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "operator"
+              },
+              {
+                "kind": "arg",
+                "path": "agent_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "agent_id",
+          "type": "u64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "AgentTerms"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit_collateral",
+      "discriminator": [
+        156,
+        131,
+        142,
+        116,
+        146,
+        247,
+        162,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "draw_funds",
+      "discriminator": [
+        147,
+        69,
+        144,
+        84,
+        18,
+        112,
+        166,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "The bound trading key or the operator. Receives the principal."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_position",
+      "discriminator": [
+        135,
+        128,
+        47,
+        77,
+        15,
+        152,
+        240,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "trader",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "duration_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "publish_agent",
+      "discriminator": [
+        84,
+        236,
+        75,
+        145,
+        32,
+        51,
+        66,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_accepting",
+      "discriminator": [
+        158,
+        244,
+        194,
+        50,
+        50,
+        228,
+        51,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "accepting",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_executor",
+      "discriminator": [
+        92,
+        0,
+        234,
+        186,
+        174,
+        14,
+        56,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "executor",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "settle_position",
+      "discriminator": [
+        33,
+        156,
+        74,
+        218,
+        215,
+        42,
+        112,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "The bound trading key or the operator. Sends the returned SOL."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "operator",
+          "writable": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trader",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "returned",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_agent",
+      "discriminator": [
+        85,
+        2,
+        178,
+        9,
+        119,
+        139,
+        102,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "AgentTerms"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw_collateral",
+      "discriminator": [
+        115,
+        135,
+        168,
+        106,
+        139,
+        214,
+        138,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent"
+          ]
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agent",
+      "discriminator": [
+        67,
+        65,
+        97,
+        103,
+        101,
+        110,
+        116,
+        50
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        67,
+        65,
+        112,
+        111,
+        115,
+        95,
+        118,
+        50
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AcceptingChanged",
+      "discriminator": [
+        119,
+        126,
+        66,
+        81,
+        87,
+        231,
+        225,
+        2
+      ]
+    },
+    {
+      "name": "AgentCreated",
+      "discriminator": [
+        237,
+        44,
+        61,
+        111,
+        90,
+        251,
+        241,
+        34
+      ]
+    },
+    {
+      "name": "AgentPublished",
+      "discriminator": [
+        201,
+        23,
+        212,
+        118,
+        54,
+        43,
+        239,
+        124
+      ]
+    },
+    {
+      "name": "BreachRecorded",
+      "discriminator": [
+        54,
+        28,
+        158,
+        47,
+        103,
+        87,
+        147,
+        217
+      ]
+    },
+    {
+      "name": "CollateralChanged",
+      "discriminator": [
+        172,
+        114,
+        48,
+        57,
+        98,
+        83,
+        95,
+        157
+      ]
+    },
+    {
+      "name": "ExecutorBound",
+      "discriminator": [
+        159,
+        2,
+        93,
+        179,
+        55,
+        198,
+        135,
+        248
+      ]
+    },
+    {
+      "name": "FundsDrawn",
+      "discriminator": [
+        188,
+        128,
+        5,
+        3,
+        185,
+        33,
+        51,
+        105
+      ]
+    },
+    {
+      "name": "PositionClosed",
+      "discriminator": [
+        157,
+        163,
+        227,
+        228,
+        13,
+        97,
+        138,
+        121
+      ]
+    },
+    {
+      "name": "PositionDeclined",
+      "discriminator": [
+        190,
+        231,
+        243,
+        45,
+        161,
+        145,
+        122,
+        118
+      ]
+    },
+    {
+      "name": "PositionOpened",
+      "discriminator": [
+        237,
+        175,
+        243,
+        230,
+        147,
+        117,
+        101,
+        121
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidCollateralRatio",
+      "msg": "Collateral ratio must be between the protocol minimum and maximum"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidDrawdown",
+      "msg": "Max drawdown exceeds the protocol limit"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidName",
+      "msg": "Name is empty or too long"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidDescription",
+      "msg": "Description is too long"
+    },
+    {
+      "code": 6004,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientFreeCollateral",
+      "msg": "Agent does not have enough free collateral to guarantee this position"
+    },
+    {
+      "code": 6006,
+      "name": "UnauthorizedOperator",
+      "msg": "Only the agent operator may perform this action"
+    },
+    {
+      "code": 6007,
+      "name": "UnauthorizedTrader",
+      "msg": "Only the position trader may perform this action"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidStatus",
+      "msg": "Position is not in the expected status"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidDuration",
+      "msg": "Position duration is outside the agent's published trading window"
+    },
+    {
+      "code": 6010,
+      "name": "DeadlineNotReached",
+      "msg": "Position deadline has not been reached yet"
+    },
+    {
+      "code": 6011,
+      "name": "DeadlinePassed",
+      "msg": "Position deadline has passed; the trader may claim default"
+    },
+    {
+      "code": 6012,
+      "name": "AgentNotAccepting",
+      "msg": "Agent is not accepting new positions"
+    },
+    {
+      "code": 6013,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6014,
+      "name": "FeeTooHigh",
+      "msg": "Fee exceeds the cap allowed by the collateral ratio"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidTradingWindow",
+      "msg": "Trading window is invalid"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidAllowedAssets",
+      "msg": "Allowed assets must list between one and eight unique mints"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidRules",
+      "msg": "Rules must be published and fit the size limit"
+    },
+    {
+      "code": 6018,
+      "name": "TermsLocked",
+      "msg": "Terms can only be changed while the agent is a draft"
+    },
+    {
+      "code": 6019,
+      "name": "NotPublished",
+      "msg": "Agent has not been published"
+    },
+    {
+      "code": 6020,
+      "name": "AlreadyPublished",
+      "msg": "Agent is already published"
+    },
+    {
+      "code": 6021,
+      "name": "NoCollateral",
+      "msg": "Deposit collateral before publishing the agent"
+    },
+    {
+      "code": 6022,
+      "name": "UnauthorizedExecutor",
+      "msg": "Signer is neither the agent's operator nor its bound trading key"
+    },
+    {
+      "code": 6023,
+      "name": "RatioPlusDrawdownTooHigh",
+      "msg": "Collateral ratio plus max drawdown must not exceed 100% of principal"
+    }
+  ],
+  "types": [
+    {
+      "name": "AcceptingChanged",
+      "docs": [
+        "The operator paused or resumed new positions on a published agent."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "accepting",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Agent",
+      "docs": [
+        "An AI trading agent created and managed by an operator."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "operator",
+            "docs": [
+              "Creator and manager: controls terms, collateral, and the trading key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "docs": [
+              "Key allowed to draw and settle positions. Defaults to the operator."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "agent_id",
+            "docs": [
+              "Per-operator index, part of the PDA seed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "AgentStatus"
+              }
+            }
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "AgentTerms"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "published_at",
+            "type": "i64"
+          },
+          {
+            "name": "total_collateral",
+            "docs": [
+              "Lamports the operator has deposited as collateral (excluding the vault rent floor)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "docs": [
+              "Collateral reserved for open positions."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "capital_managed",
+            "docs": [
+              "Principal currently under management."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "open_positions",
+            "type": "u32"
+          },
+          {
+            "name": "settled_positions",
+            "docs": [
+              "Positions the agent drew and later settled (on time or late). Positions",
+              "declined before a draw are not counted."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "defaulted_positions",
+            "type": "u32"
+          },
+          {
+            "name": "breach_count",
+            "docs": [
+              "Positions that ended in a breach: a drawdown beyond tolerance, a late",
+              "settle, or a claimed default."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "slashed_total",
+            "type": "u64"
+          },
+          {
+            "name": "fees_earned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentPublished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "AgentTerms"
+              }
+            }
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Draft"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentTerms",
+      "docs": [
+        "The rules and collateral terms an operator publishes for an agent.",
+        "Editable while the agent is a draft, permanent once it is published."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "collateral_ratio_bps",
+            "docs": [
+              "Collateral guaranteed per deposited lamport, in bps (3000 = 30%)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Performance fee on profit, in bps. At most collateral_ratio_bps / FEE_CAP_DIVISOR."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "docs": [
+              "Loss the agent may incur before its bond pays the trader, in bps of principal."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_duration_secs",
+            "docs": [
+              "Shortest and longest position a trader may open, in seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "max_duration_secs",
+            "type": "i64"
+          },
+          {
+            "name": "allowed_assets",
+            "docs": [
+              "Token mints the agent commits to trading."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "rules",
+            "docs": [
+              "The agent's full trading rules in plain language."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Breach",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Drawdown"
+          },
+          {
+            "name": "MissedDeadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BreachRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "breach",
+            "type": {
+              "defined": {
+                "name": "Breach"
+              }
+            }
+          },
+          {
+            "name": "slashed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "delta",
+            "type": "i64"
+          },
+          {
+            "name": "total_collateral",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutorBound",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundsDrawn",
+      "docs": [
+        "The agent's trading key drew a position's principal to trade with it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "docs": [
+        "A trader's capital allocation to an agent, backed by reserved collateral."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Per-trader nonce used in the PDA seed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Snapshot of the agent's terms at open time."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "type": "u16"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PositionStatus"
+              }
+            }
+          },
+          {
+            "name": "breach",
+            "type": {
+              "defined": {
+                "name": "Breach"
+              }
+            }
+          },
+          {
+            "name": "opened_at",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "drawn_at",
+            "type": "i64"
+          },
+          {
+            "name": "closed_at",
+            "type": "i64"
+          },
+          {
+            "name": "returned",
+            "type": "u64"
+          },
+          {
+            "name": "slashed",
+            "type": "u64"
+          },
+          {
+            "name": "fee_paid",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PositionStatus"
+              }
+            }
+          },
+          {
+            "name": "breach",
+            "type": {
+              "defined": {
+                "name": "Breach"
+              }
+            }
+          },
+          {
+            "name": "returned",
+            "type": "u64"
+          },
+          {
+            "name": "slashed",
+            "type": "u64"
+          },
+          {
+            "name": "fee_paid",
+            "type": "u64"
+          },
+          {
+            "name": "trader_payout",
+            "docs": [
+              "Lamports paid to the trader for this position: returned principal",
+              "minus fee plus any slash (settle), the principal (cancel or decline),",
+              "or the slashed bond (default). Excludes the position vault's rent",
+              "floor, which is also refunded to the trader when the vault is drained."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionDeclined",
+      "docs": [
+        "The agent declined a position it never drew: the trader got the principal",
+        "back and the agent's reputation counters were not changed. Emitted",
+        "alongside `PositionClosed` (status `Settled`, breach `None`) so indexers can",
+        "tell a decline apart from a settle that returned exactly the principal."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Trading"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Defaulted"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "AGENT_SEED",
+      "type": "bytes",
+      "value": "[97, 103, 101, 110, 116]"
+    },
+    {
+      "name": "AGENT_VAULT_SEED",
+      "type": "bytes",
+      "value": "[97, 103, 101, 110, 116, 95, 118, 97, 117, 108, 116]"
+    },
+    {
+      "name": "FEE_CAP_DIVISOR",
+      "docs": [
+        "The fee an operator may charge is capped by its collateral:",
+        "fee_bps <= collateral_ratio_bps / FEE_CAP_DIVISOR.",
+        "30% collateral -> at most 15% of profit, 100% collateral -> at most 50%."
+      ],
+      "type": "u16",
+      "value": "2"
+    },
+    {
+      "name": "MAX_COLLATERAL_RATIO_BPS",
+      "docs": [
+        "Maximum collateral ratio (100%: every deposited lamport is fully backed)."
+      ],
+      "type": "u16",
+      "value": "10000"
+    },
+    {
+      "name": "MAX_DRAWDOWN_BPS",
+      "docs": [
+        "Maximum drawdown an operator may declare as tolerated trading loss (50%)."
+      ],
+      "type": "u16",
+      "value": "5000"
+    },
+    {
+      "name": "MAX_POSITION_DURATION",
+      "type": "i64",
+      "value": "7776000"
+    },
+    {
+      "name": "MIN_COLLATERAL_RATIO_BPS",
+      "docs": [
+        "Minimum collateral an agent must guarantee per unit of capital (10%)."
+      ],
+      "type": "u16",
+      "value": "1000"
+    },
+    {
+      "name": "MIN_POSITION_DURATION",
+      "docs": [
+        "Bounds for the trading window an operator may offer."
+      ],
+      "type": "i64",
+      "value": "60"
+    },
+    {
+      "name": "POSITION_SEED",
+      "type": "bytes",
+      "value": "[112, 111, 115, 105, 116, 105, 111, 110]"
+    },
+    {
+      "name": "POSITION_VAULT_SEED",
+      "type": "bytes",
+      "value": "[112, 111, 115, 105, 116, 105, 111, 110, 95, 118, 97, 117, 108, 116]"
+    }
+  ]
+}

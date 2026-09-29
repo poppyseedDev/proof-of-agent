@@ -70,6 +70,17 @@ describe("POST /api/heartbeat body", () => {
     }
   });
 
+  it("records the runner's program interface hash and rejects anything that is not one", async () => {
+    assert.equal((await beat({ agents: ["a"], idl: "a5b3a6ec25d5" })).status, 200);
+    assert.equal((await (await heartbeat.GET()).json()).idl, "a5b3a6ec25d5");
+    for (const idl of [12, "short", "A5B3A6EC25D5", "a5b3a6ec25d5<script>"]) {
+      assert.equal((await beat({ agents: ["a"], idl })).status, 400, String(idl));
+    }
+    // An older runner sends none.
+    assert.equal((await beat({ agents: ["a"] })).status, 200);
+    assert.equal((await (await heartbeat.GET()).json()).idl, null);
+  });
+
   it("accepts a string or missing note, and caps agents at 20", async () => {
     assert.equal((await beat({ agents: ["a"], note: "degraded" })).status, 200);
     assert.equal((await beat({ agents: ["a"], note: null })).status, 200);

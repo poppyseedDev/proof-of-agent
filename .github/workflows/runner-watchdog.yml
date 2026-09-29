@@ -1,6 +1,7 @@
-# Outside watchdog for the agent runner. Every 5 minutes it reads the heartbeat
-# the runner posts to the site; if it is stale the run fails, and GitHub emails
-# the repo owner. (Scheduled runs can start a few minutes late.)
+# Outside watchdog for the agent runner and the site. Every 5 minutes it reads the
+# heartbeat the runner posts to the site, and the site's own check that it can trade
+# against the deployed program. If either fails the run fails, and GitHub emails the
+# repo owner. (Scheduled runs can start a few minutes late.)
 name: runner watchdog
 
 on:
@@ -21,5 +22,15 @@ jobs:
           echo "$beat"
           echo "$beat" | jq -e '.online == true and (.agents | length) == 3' > /dev/null || {
             echo "::error::Agent runner heartbeat is stale or missing agents: $beat"
+            exit 1
+          }
+      - name: Check that the site can trade
+        if: always()
+        run: |
+          # Answers 503 when broken, so no -f: the body says why.
+          health=$(curl -sS --retry 3 --retry-delay 5 --max-time 30 https://dev.proofofagent.dev/api/health)
+          echo "$health"
+          echo "$health" | jq -e '.status == "ok" or .status == "unknown"' > /dev/null || {
+            echo "::error::The site cannot trade against the deployed program: $health"
             exit 1
           }
