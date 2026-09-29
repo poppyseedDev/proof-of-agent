@@ -33,6 +33,8 @@ const seed = (s: string) => Buffer.from(s);
 export const agentPda = (operator: PublicKey, agentId: number | BN) =>
   PublicKey.findProgramAddressSync([seed("agent"), operator.toBuffer(), new BN(agentId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID)[0];
 export const agentVaultPda = (agent: PublicKey) => PublicKey.findProgramAddressSync([seed("agent_vault"), agent.toBuffer()], PROGRAM_ID)[0];
+/** Protocol config: the pause switch and the position and agent caps. */
+export const configPda = () => PublicKey.findProgramAddressSync([seed("config")], PROGRAM_ID)[0];
 export const positionVaultPda = (position: PublicKey) => PublicKey.findProgramAddressSync([seed("position_vault"), position.toBuffer()], PROGRAM_ID)[0];
 export const positionPda = (agent: PublicKey, trader: PublicKey, nonce: BN) =>
   PublicKey.findProgramAddressSync([seed("position"), agent.toBuffer(), trader.toBuffer(), nonce.toArrayLike(Buffer, "le", 8)], PROGRAM_ID)[0];

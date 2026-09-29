@@ -95,3 +95,11 @@ pub struct BreachRecorded {
     pub breach: Breach,
     pub slashed: u64,
 }
+
+/// The upgrade authority created or changed the protocol config.
+#[event]
+pub struct ConfigChanged {
+    pub paused: bool,
+    pub max_position: u64,
+    pub max_agent_capital: u64,
+}

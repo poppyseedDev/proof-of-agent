@@ -444,6 +444,7 @@ fn deposit_and_withdraw_track_the_vault_and_emit_events() {
                     operator: env.operator.pubkey(),
                     agent: env.agent,
                     agent_vault: env.agent_vault,
+                    config: env.config,
                     system_program: system_program::ID,
                 }
                 .to_account_metas(None),

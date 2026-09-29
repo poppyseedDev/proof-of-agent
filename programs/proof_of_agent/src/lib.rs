@@ -8,6 +8,9 @@
 //!   locked as a guarantee. An agent cannot accept capital it cannot back.
 //! * If the agent misbehaves (loses beyond its declared drawdown, or never returns the
 //!   funds by the deadline) the locked collateral is paid out to the trader.
+//! * The program's upgrade authority can pause new positions, draws and deposits,
+//!   and cap the size of positions and agents. It cannot move funds or stop
+//!   anyone from getting money back.
 
 pub mod constants;
 pub mod error;
@@ -95,5 +98,19 @@ pub mod proof_of_agent {
 
     pub fn claim_default(ctx: Context<ClaimDefault>) -> Result<()> {
         instructions::claim_default::handle_claim_default(ctx)
+    }
+
+    // ---- protocol admin: the program's upgrade authority ----
+
+    pub fn init_config(ctx: Context<InitConfig>, max_position: u64, max_agent_capital: u64) -> Result<()> {
+        instructions::config::handle_init_config(ctx, max_position, max_agent_capital)
+    }
+
+    pub fn set_paused(ctx: Context<SetConfig>, paused: bool) -> Result<()> {
+        instructions::config::handle_set_paused(ctx, paused)
+    }
+
+    pub fn set_caps(ctx: Context<SetConfig>, max_position: u64, max_agent_capital: u64) -> Result<()> {
+        instructions::config::handle_set_caps(ctx, max_position, max_agent_capital)
     }
 }

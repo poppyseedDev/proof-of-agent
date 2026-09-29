@@ -188,3 +188,27 @@ pub struct Position {
     pub bump: u8,
     pub vault_bump: u8,
 }
+
+/// Protocol-wide limits, set by the program's upgrade authority. They can stop
+/// new money from entering and cap how much a position or an agent may hold.
+/// They cannot move funds, and nothing here stops a trader from cancelling,
+/// an agent from settling, a trader from claiming a default, or an operator
+/// from withdrawing free collateral.
+#[account(discriminator = CONFIG_DISCRIMINATOR)]
+#[derive(InitSpace)]
+pub struct Config {
+    /// Stops new positions, draws and collateral deposits.
+    pub paused: bool,
+    /// Largest principal one position may hold, in lamports.
+    pub max_position: u64,
+    /// Largest principal one agent may manage across its open positions, in lamports.
+    pub max_agent_capital: u64,
+    pub bump: u8,
+}
+
+impl Config {
+    pub fn validate_caps(max_position: u64, max_agent_capital: u64) -> Result<()> {
+        require!(max_position > 0 && max_agent_capital > 0, ErrorCode::InvalidCaps);
+        Ok(())
+    }
+}

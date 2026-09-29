@@ -16,6 +16,7 @@ import {
 } from "@solana/web3.js";
 import idl from "../lib/idl.json";
 import { agentPda, agentVaultPda, positionPda, positionVaultPda } from "../lib/program";
+import { U64_MAX, ensureConfig, loadAdmin, setCaps, setPaused } from "../scripts/protocolConfig";
 
 const RPC = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8899";
 const SOL = LAMPORTS_PER_SOL;
@@ -158,6 +159,8 @@ describe("proof_of_agent on localnet", () => {
     const info = await connection.getAccountInfo(PROGRAM_ID);
     assert.ok(info?.executable, `program ${PROGRAM_ID} is not deployed at ${RPC}. Run: npm run deploy:local`);
     rentFloor = await connection.getMinimumBalanceForRentExemption(0);
+    // The CLI wallet deployed the program, so it is the upgrade authority and admin.
+    await ensureConfig(connection, loadAdmin());
   });
 
   it("creates a draft with published terms, then publishes once bonded", async () => {
@@ -305,6 +308,27 @@ describe("proof_of_agent on localnet", () => {
     await env.ap.methods.setAccepting(false).accounts({ operator: env.agentKp.publicKey, agent: env.agent }).rpc();
     await expectAnchorError(env.open(0.1 * SOL, 3600), "AgentNotAccepting");
     await env.ap.methods.setAccepting(true).accounts({ operator: env.agentKp.publicKey, agent: env.agent }).rpc();
+    await env.open(0.1 * SOL, 3600);
+  });
+
+  it("enforces the protocol caps and pause switch set by the upgrade authority", async () => {
+    const admin = loadAdmin();
+    const env = await setup(3000, 2000, 1);
+    try {
+      await setCaps(connection, admin, new BN(0.2 * SOL), new BN(0.3 * SOL));
+      await expectAnchorError(env.open(0.2 * SOL + 1, 3600), "PositionTooLarge");
+      await env.open(0.2 * SOL, 3600);
+      await expectAnchorError(env.open(0.2 * SOL, 3600), "AgentCapReached");
+      await setPaused(connection, admin, true);
+      await expectAnchorError(env.open(0.1 * SOL, 3600), "ProtocolPaused");
+      // A stranger cannot resume.
+      const stranger = Keypair.generate();
+      await fund(stranger, 1);
+      await expectAnchorError(setPaused(connection, stranger, false), "UnauthorizedAdmin");
+    } finally {
+      await setPaused(connection, admin, false);
+      await setCaps(connection, admin, U64_MAX, U64_MAX);
+    }
     await env.open(0.1 * SOL, 3600);
   });
 

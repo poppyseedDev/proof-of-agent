@@ -4,7 +4,7 @@ use crate::{
     constants::*,
     error::ErrorCode,
     events::PositionOpened,
-    state::{Agent, AgentStatus, AgentTerms, Breach, Position, PositionStatus},
+    state::{Agent, AgentStatus, AgentTerms, Breach, Config, Position, PositionStatus},
 };
 
 #[derive(Accounts)]
@@ -32,6 +32,8 @@ pub struct OpenPosition<'info> {
         bump
     )]
     pub position_vault: SystemAccount<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
     pub system_program: Program<'info, System>,
 }
 
@@ -53,8 +55,13 @@ pub fn handle_open_position(
     duration_secs: i64,
 ) -> Result<()> {
     require!(amount > 0, ErrorCode::ZeroAmount);
+    let config = &ctx.accounts.config;
+    require!(!config.paused, ErrorCode::ProtocolPaused);
+    require!(amount <= config.max_position, ErrorCode::PositionTooLarge);
     let agent = &mut ctx.accounts.agent;
     require!(agent.status == AgentStatus::Active, ErrorCode::AgentNotAccepting);
+    let managed_after = agent.capital_managed.checked_add(amount).ok_or(ErrorCode::Overflow)?;
+    require!(managed_after <= config.max_agent_capital, ErrorCode::AgentCapReached);
     // The trader picks a deadline inside the window the operator published.
     require!(
         (agent.terms.min_duration_secs..=agent.terms.max_duration_secs).contains(&duration_secs),
@@ -82,10 +89,7 @@ pub fn handle_open_position(
         .locked_collateral
         .checked_add(locked)
         .ok_or(ErrorCode::Overflow)?;
-    agent.capital_managed = agent
-        .capital_managed
-        .checked_add(amount)
-        .ok_or(ErrorCode::Overflow)?;
+    agent.capital_managed = managed_after;
     agent.open_positions += 1;
 
     // Move principal (plus the vault rent floor) into the position vault.

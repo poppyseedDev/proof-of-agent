@@ -4,7 +4,7 @@ use crate::{
     constants::*,
     error::ErrorCode,
     events::FundsDrawn,
-    state::{Agent, Position, PositionStatus},
+    state::{Agent, Config, Position, PositionStatus},
 };
 
 /// The agent's trading key pulls the trader's principal out of the position
@@ -13,6 +13,9 @@ use crate::{
 ///
 /// While the position is Open, this races the trader's `cancel_position`:
 /// whichever transaction lands first wins. There is no grace period.
+///
+/// Stopped while the protocol is paused. An undrawn position cannot default,
+/// so the trader can still cancel it and the agent can still decline it.
 #[derive(Accounts)]
 pub struct DrawFunds<'info> {
     /// The bound trading key or the operator. Receives the principal.
@@ -37,10 +40,13 @@ pub struct DrawFunds<'info> {
         bump = position.vault_bump
     )]
     pub position_vault: SystemAccount<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
     pub system_program: Program<'info, System>,
 }
 
 pub fn handle_draw_funds(ctx: Context<DrawFunds>) -> Result<()> {
+    require!(!ctx.accounts.config.paused, ErrorCode::ProtocolPaused);
     let position = &mut ctx.accounts.position;
     require!(position.status == PositionStatus::Open, ErrorCode::InvalidStatus);
     let now = Clock::get()?.unix_timestamp;

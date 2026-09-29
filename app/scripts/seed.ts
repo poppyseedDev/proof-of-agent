@@ -2,10 +2,12 @@
  * Seed a local validator with demo agents so the ledger has something to show.
  *   npm run seed                     -> 4 published agents
  *   npm run fund -- <wallet-address> -> airdrop 10 SOL to your browser wallet
+ * Also creates the protocol config (no caps) if it is missing.
  */
 import { AnchorProvider, BN, Idl, Program, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import idl from "../lib/idl.json";
+import { ensureConfig, loadAdmin } from "./protocolConfig";
 
 const RPC = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8899";
 const PROGRAM_ID = new PublicKey(idl.address);
@@ -37,6 +39,9 @@ async function main() {
     console.log(`funded ${to.toBase58()} with 10 SOL`);
     return;
   }
+
+  // Positions cannot open until the config exists. The CLI wallet deployed the program, so it is the admin.
+  await ensureConfig(connection, loadAdmin());
 
   for (const a of AGENTS) {
     const operator = Keypair.generate();

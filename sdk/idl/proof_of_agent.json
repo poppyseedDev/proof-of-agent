@@ -455,6 +455,24 @@
           }
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -582,11 +600,163 @@
           }
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
+    },
+    {
+      "name": "init_config",
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  46,
+                  197,
+                  89,
+                  202,
+                  59,
+                  66,
+                  69,
+                  116,
+                  159,
+                  187,
+                  25,
+                  32,
+                  197,
+                  140,
+                  2,
+                  217,
+                  134,
+                  32,
+                  222,
+                  99,
+                  131,
+                  144,
+                  102,
+                  204,
+                  33,
+                  3,
+                  6,
+                  176,
+                  213,
+                  104,
+                  142,
+                  231
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2,
+                168,
+                246,
+                145,
+                78,
+                136,
+                161,
+                176,
+                226,
+                16,
+                21,
+                62,
+                247,
+                99,
+                174,
+                43,
+                0,
+                194,
+                185,
+                61,
+                22,
+                193,
+                36,
+                210,
+                192,
+                83,
+                122,
+                16,
+                4,
+                128,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_position",
+          "type": "u64"
+        },
+        {
+          "name": "max_agent_capital",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "open_position",
@@ -694,6 +864,24 @@
               {
                 "kind": "account",
                 "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -826,6 +1014,135 @@
       ]
     },
     {
+      "name": "set_caps",
+      "discriminator": [
+        173,
+        204,
+        47,
+        125,
+        102,
+        192,
+        240,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  46,
+                  197,
+                  89,
+                  202,
+                  59,
+                  66,
+                  69,
+                  116,
+                  159,
+                  187,
+                  25,
+                  32,
+                  197,
+                  140,
+                  2,
+                  217,
+                  134,
+                  32,
+                  222,
+                  99,
+                  131,
+                  144,
+                  102,
+                  204,
+                  33,
+                  3,
+                  6,
+                  176,
+                  213,
+                  104,
+                  142,
+                  231
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2,
+                168,
+                246,
+                145,
+                78,
+                136,
+                161,
+                176,
+                226,
+                16,
+                21,
+                62,
+                247,
+                99,
+                174,
+                43,
+                0,
+                194,
+                185,
+                61,
+                22,
+                193,
+                36,
+                210,
+                192,
+                83,
+                122,
+                16,
+                4,
+                128,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "max_position",
+          "type": "u64"
+        },
+        {
+          "name": "max_agent_capital",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "set_executor",
       "discriminator": [
         92,
@@ -878,6 +1195,131 @@
         {
           "name": "executor",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_paused",
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  46,
+                  197,
+                  89,
+                  202,
+                  59,
+                  66,
+                  69,
+                  116,
+                  159,
+                  187,
+                  25,
+                  32,
+                  197,
+                  140,
+                  2,
+                  217,
+                  134,
+                  32,
+                  222,
+                  99,
+                  131,
+                  144,
+                  102,
+                  204,
+                  33,
+                  3,
+                  6,
+                  176,
+                  213,
+                  104,
+                  142,
+                  231
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2,
+                168,
+                246,
+                145,
+                78,
+                136,
+                161,
+                176,
+                226,
+                16,
+                21,
+                62,
+                247,
+                99,
+                174,
+                43,
+                0,
+                194,
+                185,
+                61,
+                22,
+                193,
+                36,
+                210,
+                192,
+                83,
+                122,
+                16,
+                4,
+                128,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
         }
       ]
     },
@@ -1220,6 +1662,19 @@
       ]
     },
     {
+      "name": "Config",
+      "discriminator": [
+        67,
+        65,
+        99,
+        111,
+        110,
+        102,
+        105,
+        103
+      ]
+    },
+    {
       "name": "Position",
       "discriminator": [
         67,
@@ -1297,6 +1752,19 @@
         83,
         95,
         157
+      ]
+    },
+    {
+      "name": "ConfigChanged",
+      "discriminator": [
+        147,
+        25,
+        86,
+        98,
+        98,
+        77,
+        78,
+        192
       ]
     },
     {
@@ -1485,6 +1953,31 @@
       "code": 6023,
       "name": "RatioPlusDrawdownTooHigh",
       "msg": "Collateral ratio plus max drawdown must not exceed 100% of principal"
+    },
+    {
+      "code": 6024,
+      "name": "ProtocolPaused",
+      "msg": "The protocol is paused: new positions, draws and deposits are stopped"
+    },
+    {
+      "code": 6025,
+      "name": "PositionTooLarge",
+      "msg": "Position is larger than the protocol allows"
+    },
+    {
+      "code": 6026,
+      "name": "AgentCapReached",
+      "msg": "Agent would manage more capital than the protocol allows"
+    },
+    {
+      "code": 6027,
+      "name": "UnauthorizedAdmin",
+      "msg": "Only the program's upgrade authority may change the protocol config"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidCaps",
+      "msg": "Caps must be greater than zero"
     }
   ],
   "types": [
@@ -1827,6 +2320,69 @@
       }
     },
     {
+      "name": "Config",
+      "docs": [
+        "Protocol-wide limits, set by the program's upgrade authority. They can stop",
+        "new money from entering and cap how much a position or an agent may hold.",
+        "They cannot move funds, and nothing here stops a trader from cancelling,",
+        "an agent from settling, a trader from claiming a default, or an operator",
+        "from withdrawing free collateral."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "docs": [
+              "Stops new positions, draws and collateral deposits."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "max_position",
+            "docs": [
+              "Largest principal one position may hold, in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_agent_capital",
+            "docs": [
+              "Largest principal one agent may manage across its open positions, in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigChanged",
+      "docs": [
+        "The upgrade authority created or changed the protocol config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "max_position",
+            "type": "u64"
+          },
+          {
+            "name": "max_agent_capital",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutorBound",
       "type": {
         "kind": "struct",
@@ -2128,6 +2684,11 @@
       "name": "AGENT_VAULT_SEED",
       "type": "bytes",
       "value": "[97, 103, 101, 110, 116, 95, 118, 97, 117, 108, 116]"
+    },
+    {
+      "name": "CONFIG_SEED",
+      "type": "bytes",
+      "value": "[99, 111, 110, 102, 105, 103]"
     },
     {
       "name": "FEE_CAP_DIVISOR",

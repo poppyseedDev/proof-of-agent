@@ -1,5 +1,6 @@
 pub mod cancel_position;
 pub mod claim_default;
+pub mod config;
 pub mod create_agent;
 pub mod deposit_collateral;
 pub mod draw_funds;
@@ -13,6 +14,7 @@ pub mod withdraw_collateral;
 
 pub use cancel_position::*;
 pub use claim_default::*;
+pub use config::*;
 pub use create_agent::*;
 pub use deposit_collateral::*;
 pub use draw_funds::*;

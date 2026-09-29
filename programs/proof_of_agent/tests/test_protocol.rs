@@ -501,6 +501,7 @@ fn a_position_cannot_be_used_with_another_agent() {
             agent: agent_b,
             position: pos_a,
             position_vault: vault_a,
+            config: env.config,
             system_program: system_program::ID,
         }
         .to_account_metas(None),
@@ -635,6 +636,7 @@ fn draw_and_set_accepting_emit_events() {
             agent: env.agent,
             position,
             position_vault,
+            config: env.config,
             system_program: system_program::ID,
         }
         .to_account_metas(None),

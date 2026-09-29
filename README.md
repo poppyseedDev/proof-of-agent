@@ -61,7 +61,7 @@ anchor deploy --provider.cluster localnet
 
 # 3. frontend against localnet (app/.env.local already points at 127.0.0.1:8899)
 cd app && npm install
-npm run seed                          # registers 4 demo agents with collateral
+npm run seed                          # creates the protocol config, registers 4 demo agents with collateral
 npm run fund -- <your-wallet-address> # 10 SOL to your browser wallet
 npm run dev
 npm run test:localnet                 # integration tests through the RPC (~90s)
@@ -96,6 +96,14 @@ upgrade authority is the deploy wallet
 anchor build
 solana program deploy target/deploy/proof_of_agent.so \
   --program-id target/deploy/proof_of_agent-keypair.json -u devnet
+```
+
+After deploying a program version that has the protocol config for the first
+time, create the config straight away, because no position can open, draw or
+take a deposit until it exists:
+
+```bash
+NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com npm run config -- init none none
 ```
 
 The Vercel deployment reads `NEXT_PUBLIC_RPC_URL` / `NEXT_PUBLIC_CLUSTER`
@@ -163,6 +171,28 @@ never cost an operator its bond. What costs money is publishing a floor tighter
 than the strategy can hold. See [sim/README.md](sim/README.md) for the tables
 and [docs/settlement.md](docs/settlement.md) for how that follows from the
 settlement rule.
+
+## Pause switch and caps
+
+The program's upgrade authority can pause the protocol and cap how much money
+it holds. Admin rights come from the upgrade authority itself (read from the
+program's ProgramData account), so moving that authority to a multisig moves
+these controls with it, and making the program immutable removes them.
+
+```bash
+npm run config                     # show the current settings
+npm run config -- caps 5 20        # at most 5 SOL per position, 20 SOL per agent ("none" for no cap)
+npm run config -- pause            # stop new positions, draws and collateral deposits
+npm run config -- resume
+```
+
+It signs with `ADMIN_KEYPAIR` (default `~/.config/solana/id.json`) on
+`NEXT_PUBLIC_RPC_URL` (default localnet).
+
+A pause never blocks money going back. Traders can still cancel and claim
+defaults, agents can still settle and decline, and operators can still
+withdraw free collateral. Draws stop because an undrawn position cannot
+default: the trader can cancel it. New caps apply to new positions only.
 
 ## Trust model (v1)
 

@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useBalance, type TxState } from "@/lib/useProtocol";
 import {
   AgentAccount,
+  ProtocolConfig,
   assetLabel,
   capacity,
   feePct,
@@ -43,12 +44,15 @@ function durationsFor(agent: AgentAccount) {
 /** Swap-style widget: what a trader gets when allocating capital to an agent. */
 export function Certificate({
   agent,
+  config,
   connected,
   busy,
   tx,
   onOpen,
 }: {
   agent: AgentAccount | null;
+  /** Protocol pause and caps; null while unknown. */
+  config: ProtocolConfig | null;
   connected: boolean;
   busy: boolean;
   /** Latest transaction state; a confirmed one refreshes the balance. */
@@ -99,14 +103,16 @@ export function Certificate({
   const duration = durations.some((d) => d.secs === picked) ? picked! : durations[Math.min(1, durations.length - 1)].secs;
   const lamports = parseSolInput(amount);
   const guaranteed = requiredCollateral(lamports, agent.terms.collateralRatioBps);
-  const cap = capacity(agent);
+  const cap = capacity(agent, config);
   const overCap = lamports > cap;
   const overBalance = balance !== null && lamports > maxLamports;
   const tolerance = Math.floor((lamports * agent.terms.maxDrawdownBps) / 10_000);
 
   const label = !connected
     ? "Connect wallet"
-    : agent.status !== "active"
+    : config?.paused
+      ? "Allocations paused"
+      : agent.status !== "active"
       ? "Agent paused"
       : !(lamports > 0)
         ? "Enter an amount"
@@ -222,7 +228,7 @@ export function Certificate({
       )}
       <button
         className="btn lg"
-        disabled={!connected || busy || overCap || overBalance || agent.status !== "active" || !(lamports > 0)}
+        disabled={!connected || busy || !!config?.paused || overCap || overBalance || agent.status !== "active" || !(lamports > 0)}
         onClick={() => onOpen(lamports, duration)}
       >
         {label}

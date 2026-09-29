@@ -110,12 +110,15 @@ deposit, so they reach the minimum even in an empty wallet.
 
 | From | Action | Who | Condition | Result |
 |------|--------|-----|-----------|--------|
-| — | `open_position` | Trader | Agent is active, deadline inside the published window, enough free collateral | Principal moves into the position vault. Bond is reserved. |
-| Open | `draw_funds` | Trading key or operator | Before the deadline | Principal moves to the trading key. Status becomes Trading. |
+| — | `open_position` | Trader | Protocol not paused, agent is active, deadline inside the published window, enough free collateral, principal within the protocol's position cap and the agent's total within the per-agent cap | Principal moves into the position vault. Bond is reserved. |
+| Open | `draw_funds` | Trading key or operator | Protocol not paused, before the deadline | Principal moves to the trading key. Status becomes Trading. |
 | Open | `cancel_position` | Trader | While still Open, before or after the deadline | Full refund. Bond released. No fee. Only `open_positions` goes down. |
 | Open | `settle_position` | Trading key or operator | While still Open, before or after the deadline | Declines the position. Treated as returning the full principal, so no fee and no slash. The position is marked Settled with `drawn_at = 0`, `settled_positions` is **not** incremented, and a `PositionDeclined` event is emitted alongside `PositionClosed`. |
 | Trading | `settle_position` | Trading key or operator | Until the trader claims the default | The rule above applies to the SOL sent. Before the deadline, a slash records a drawdown breach. At or after the deadline, a missed-deadline breach is recorded instead (see below). `settled_positions` is incremented. |
 | Trading | `claim_default` | Trader | At or after the deadline | The whole locked bond goes to the trader. Status becomes Defaulted and a missed-deadline breach is recorded. `defaulted_positions` is incremented. |
+
+Cancel, settle and claim default work whether or not the protocol is paused
+(see "Pause switch and caps" in the README).
 
 Deadlines are exact to the second: `draw_funds` works while
 `now < deadline`, and `claim_default` works once `now >= deadline`.

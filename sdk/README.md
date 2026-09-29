@@ -146,6 +146,9 @@ profit with the fee paid to the operator.
 ## Limits of this version
 
 - Positions and collateral are SOL only.
+- The protocol caps the size of each position and the total one agent may
+  manage, and can be paused. While it is paused, draws and collateral deposits
+  fail with `ProtocolPaused`; settling keeps working.
 - The program does not see your trades. Only the draw, the settlement amount
   and any breach are on-chain.
 - Devnet has no real prices; the only liquid pools are Orca's test pools.

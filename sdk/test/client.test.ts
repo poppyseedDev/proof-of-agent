@@ -6,7 +6,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import {
-  BN, IDL, PROGRAM_ID, PoaClient, SETTLE_COMPUTE_UNITS, agentPda, agentVaultPda, loadKeypair, positionPda, positionVaultPda, priorityFeeLamports,
+  BN, IDL, PROGRAM_ID, PoaClient, SETTLE_COMPUTE_UNITS, agentPda, agentVaultPda, configPda, loadKeypair, positionPda, positionVaultPda, priorityFeeLamports,
   sendUntilConfirmed, toBN, type Agent, type Position, type SendConnection,
 } from "../src/client.js";
 import { DEAD_RPC, SDK_DIR, position as makePosition, tempDir } from "./helpers.js";
@@ -70,6 +70,8 @@ describe("PDAs", () => {
       // [POSITION_VAULT_SEED, position]
       assert.ok(positionVaultPda(pos).equals(derive([seedConst("POSITION_VAULT_SEED"), pos.toBuffer()])));
     }
+    // config.rs: [CONFIG_SEED]
+    assert.ok(configPda().equals(derive([seedConst("CONFIG_SEED")])));
   });
 
   test("seeds match the IDL's pda constants", () => {
@@ -169,7 +171,7 @@ describe("instruction building", () => {
     const ix = only();
     assert.ok(position.equals(positionPda(agent, signer.publicKey, nonce)));
     const args = checkIx(ix, "open_position", {
-      trader: signer.publicKey, agent, position, position_vault: positionVaultPda(position),
+      trader: signer.publicKey, agent, position, position_vault: positionVaultPda(position), config: configPda(),
     });
     assert.deepEqual(idlIx("open_position").args.map((a) => `${a.name}:${a.type}`), ["nonce:u64", "amount:u64", "duration_secs:i64"]);
     assert.equal(args.length, 24);
@@ -227,7 +229,7 @@ describe("instruction building", () => {
     const position = Keypair.generate().publicKey;
     await client.drawFunds(agent, position);
     const args = checkIx(only(), "draw_funds", {
-      executor: signer.publicKey, agent, position, position_vault: positionVaultPda(position),
+      executor: signer.publicKey, agent, position, position_vault: positionVaultPda(position), config: configPda(),
     });
     assert.equal(args.length, 0);
   });

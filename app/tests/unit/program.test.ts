@@ -7,6 +7,8 @@ import {
   PROGRAM_ID,
   agentPda,
   agentVaultPda,
+  capacity,
+  decodeConfig,
   fmtDuration,
   maxFeeForRatio,
   feePct,
@@ -17,6 +19,7 @@ import {
   short,
   sol,
   toLamports,
+  type AgentAccount,
 } from "@/lib/program";
 import { withLocale } from "./helpers/locale";
 
@@ -145,6 +148,34 @@ describe("on-chain math mirrors", () => {
     assert.equal(requiredCollateral(1_000_000_000, 3_000), 300_000_000);
     assert.equal(requiredCollateral(1, 3_000), 1);
     assert.equal(requiredCollateral(0, 3_000), 0);
+  });
+
+  // 3 SOL bond, 1 SOL reserved, at 50%: free collateral backs 4 SOL.
+  const agent = {
+    totalCollateral: new BN(3e9),
+    lockedCollateral: new BN(1e9),
+    capitalManaged: new BN(2e9),
+    terms: { collateralRatioBps: 5_000 },
+  } as unknown as AgentAccount;
+  const open = { paused: false, maxPosition: Number.MAX_SAFE_INTEGER, maxAgentCapital: Number.MAX_SAFE_INTEGER };
+
+  it("capacity is what free collateral backs when there are no caps", () => {
+    assert.equal(capacity(agent), 4e9);
+    assert.equal(capacity(agent, open), 4e9);
+  });
+  it("capacity respects the position cap and what is left under the agent cap", () => {
+    assert.equal(capacity(agent, { ...open, maxPosition: 1e9 }), 1e9);
+    assert.equal(capacity(agent, { ...open, maxAgentCapital: 5e9 }), 3e9);
+    // An agent already above a lowered cap has no room, not negative room.
+    assert.equal(capacity(agent, { ...open, maxAgentCapital: 1e9 }), 0);
+  });
+  it("decodeConfig turns u64::MAX (no cap) into the largest safe number", () => {
+    const max = new BN("18446744073709551615");
+    assert.deepEqual(decodeConfig({ paused: true, maxPosition: max, maxAgentCapital: new BN(5e9) }), {
+      paused: true,
+      maxPosition: Number.MAX_SAFE_INTEGER,
+      maxAgentCapital: 5e9,
+    });
   });
 });
 

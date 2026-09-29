@@ -9,6 +9,7 @@ import { u64 } from "./amounts";
 import {
   AgentAccount,
   PositionAccount,
+  ProtocolConfig,
   agentPda,
   agentVaultPda,
   isPublished,
@@ -28,6 +29,7 @@ export type AgentStats = {
 export function useAgents() {
   const [agents, setAgents] = useState<AgentAccount[]>([]);
   const [stats, setStats] = useState<Record<string, AgentStats>>({});
+  const [config, setConfig] = useState<ProtocolConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +52,7 @@ export function useAgents() {
       }
       setAgents(list);
       setStats(next);
+      setConfig(snap.config);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -61,7 +64,7 @@ export function useAgents() {
   useEffect(() => {
     refresh();
   }, [refresh]);
-  return { agents, stats, loading, error, refresh: () => refresh(true) };
+  return { agents, stats, config, loading, error, refresh: () => refresh(true) };
 }
 
 /** Positions belonging to a trader or to an agent. */

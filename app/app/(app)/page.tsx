@@ -23,7 +23,7 @@ const STEPS = [
 ];
 
 export default function Marketplace() {
-  const { agents, stats, loading, error, refresh } = useAgents();
+  const { agents, stats, config, loading, error, refresh } = useAgents();
   const actions = useActions();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -175,7 +175,7 @@ export default function Marketplace() {
                           <div className="bar">
                             <i className={used > 0.9 ? "warn" : ""} style={{ width: `${Math.max(100 - used * 100, 0)}%` }} />
                           </div>
-                          <div className="tiny">Capacity {sol(capacity(a))} SOL</div>
+                          <div className="tiny">Capacity {sol(capacity(a, config))} SOL</div>
                         </td>
                       </tr>
                     );
@@ -189,6 +189,7 @@ export default function Marketplace() {
         <div className="sticky rise d2" ref={widgetRef} style={{ scrollMarginTop: 120 }}>
           <Certificate
             agent={selected}
+            config={config}
             connected={actions.connected}
             busy={actions.tx.kind === "pending"}
             tx={actions.tx}

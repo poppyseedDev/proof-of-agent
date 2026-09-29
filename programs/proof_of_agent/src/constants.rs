@@ -8,6 +8,8 @@ pub const AGENT_VAULT_SEED: &[u8] = b"agent_vault";
 pub const POSITION_SEED: &[u8] = b"position";
 #[constant]
 pub const POSITION_VAULT_SEED: &[u8] = b"position_vault";
+#[constant]
+pub const CONFIG_SEED: &[u8] = b"config";
 
 pub const BPS_DENOMINATOR: u64 = 10_000;
 
@@ -42,3 +44,4 @@ pub const MAX_ALLOWED_ASSETS: usize = 8;
 /// v1 accounts that already exist on devnet under the same program id.
 pub const AGENT_DISCRIMINATOR: &[u8] = b"CAagent2";
 pub const POSITION_DISCRIMINATOR: &[u8] = b"CApos_v2";
+pub const CONFIG_DISCRIMINATOR: &[u8] = b"CAconfig";

@@ -8,6 +8,7 @@
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
     "fund": "tsx scripts/seed.ts fund",
+    "config": "tsx scripts/config.ts",
     "test": "tsx --test tests/unit/*.test.ts",
     "test:localnet": "tsx --test tests/localnet.test.ts"
   },

@@ -6,6 +6,7 @@
     "build": "npm --prefix app run build",
     "seed": "npm --prefix app run seed",
     "fund": "npm --prefix app run fund --",
+    "config": "npm --prefix app run config --",
     "validator": "solana-test-validator --reset --quiet --ledger test-ledger",
     "deploy:local": "anchor build && anchor deploy --provider.cluster localnet && cp target/idl/proof_of_agent.json app/lib/idl.json",
     "test": "cargo test --manifest-path programs/proof_of_agent/Cargo.toml",

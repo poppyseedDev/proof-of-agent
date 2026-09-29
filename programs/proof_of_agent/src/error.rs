@@ -50,4 +50,14 @@ pub enum ErrorCode {
     UnauthorizedExecutor,
     #[msg("Collateral ratio plus max drawdown must not exceed 100% of principal")]
     RatioPlusDrawdownTooHigh,
+    #[msg("The protocol is paused: new positions, draws and deposits are stopped")]
+    ProtocolPaused,
+    #[msg("Position is larger than the protocol allows")]
+    PositionTooLarge,
+    #[msg("Agent would manage more capital than the protocol allows")]
+    AgentCapReached,
+    #[msg("Only the program's upgrade authority may change the protocol config")]
+    UnauthorizedAdmin,
+    #[msg("Caps must be greater than zero")]
+    InvalidCaps,
 }

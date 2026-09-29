@@ -174,10 +174,27 @@ export function requiredCollateral(principalLamports: number, ratioBps: number) 
 export function freeCollateral(a: AgentAccount) {
   return a.totalCollateral.sub(a.lockedCollateral);
 }
-/** Max principal an agent can still back with its free collateral. */
-export function capacity(a: AgentAccount) {
+/** Protocol-wide limits set by the program's upgrade authority, in lamports. */
+export type ProtocolConfig = { paused: boolean; maxPosition: number; maxAgentCapital: number };
+
+// "No cap" is stored as u64::MAX, which does not fit in a JS number.
+const toSafeNumber = (b: BN) => (b.gt(new BN(Number.MAX_SAFE_INTEGER)) ? Number.MAX_SAFE_INTEGER : b.toNumber());
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function decodeConfig(raw: any): ProtocolConfig {
+  return { paused: raw.paused, maxPosition: toSafeNumber(raw.maxPosition), maxAgentCapital: toSafeNumber(raw.maxAgentCapital) };
+}
+
+/**
+ * Max principal a new position on this agent may hold: what its free collateral
+ * can back, within the protocol's position and per-agent caps when `config` is given.
+ */
+export function capacity(a: AgentAccount, config: ProtocolConfig | null = null) {
   const free = freeCollateral(a).toNumber();
-  return Math.floor((free * BPS) / a.terms.collateralRatioBps);
+  const backed = Math.floor((free * BPS) / a.terms.collateralRatioBps);
+  if (!config) return backed;
+  const underAgentCap = Math.max(0, config.maxAgentCapital - a.capitalManaged.toNumber());
+  return Math.min(backed, config.maxPosition, underAgentCap);
 }
 /** Max principal the agent's whole bond could back. */
 export function maxCapacity(a: AgentAccount) {

@@ -13,7 +13,7 @@ pub use {
     litesvm::LiteSVM,
     proof_of_agent::{
         constants::*,
-        state::{Agent, AgentStatus, AgentTerms, Breach, Position, PositionStatus},
+        state::{Agent, AgentStatus, AgentTerms, Breach, Config, Position, PositionStatus},
     },
     solana_keypair::Keypair,
     solana_message::{Message, VersionedMessage},
@@ -39,6 +39,10 @@ pub fn terms(ratio: u16, fee: u16, drawdown: u16) -> AgentTerms {
 pub struct Env {
     pub svm: LiteSVM,
     pub program_id: Pubkey,
+    /// The program's upgrade authority, and so the protocol admin.
+    pub admin: Keypair,
+    pub config: Pubkey,
+    pub program_data: Pubkey,
     pub operator: Keypair,
     pub executor: Keypair,
     pub trader: Keypair,
@@ -48,7 +52,16 @@ pub struct Env {
 }
 
 impl Env {
+    /// A fresh program with its config initialised, no caps in effect.
     pub fn new() -> Self {
+        let mut env = Self::without_config();
+        let admin = env.admin.insecure_clone();
+        env.init_config_as(u64::MAX, u64::MAX, &admin).unwrap();
+        env
+    }
+
+    /// A fresh program whose admin has not created the config yet.
+    pub fn without_config() -> Self {
         let program_id = proof_of_agent::id();
         let mut svm = LiteSVM::new();
         let bytes = include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/proof_of_agent.so"));
@@ -57,10 +70,20 @@ impl Env {
         let mut clock: Clock = svm.get_sysvar();
         clock.unix_timestamp = 1_789_000_000;
         svm.set_sysvar(&clock);
+        // LiteSVM loads the program with no upgrade authority; make `admin` the authority.
+        let admin = Keypair::new();
+        let upgradeable = anchor_lang::solana_program::bpf_loader_upgradeable::ID;
+        let program_data = Pubkey::find_program_address(&[program_id.as_ref()], &upgradeable).0;
+        let mut pd = svm.get_account(&program_data).unwrap();
+        // ProgramData metadata: u32 variant, u64 slot, Option<Pubkey> authority.
+        pd.data[12] = 1;
+        pd.data[13..45].copy_from_slice(admin.pubkey().as_ref());
+        svm.set_account(program_data, pd).unwrap();
+        let config = Pubkey::find_program_address(&[CONFIG_SEED], &program_id).0;
         let operator = Keypair::new();
         let executor = Keypair::new();
         let trader = Keypair::new();
-        for k in [&operator, &executor, &trader] {
+        for k in [&admin, &operator, &executor, &trader] {
             svm.airdrop(&k.pubkey(), 100 * SOL).unwrap();
         }
         let agent_id = 7u64;
@@ -70,7 +93,66 @@ impl Env {
         )
         .0;
         let agent_vault = Pubkey::find_program_address(&[AGENT_VAULT_SEED, agent.as_ref()], &program_id).0;
-        Self { svm, program_id, operator, executor, trader, agent, agent_vault, agent_id }
+        Self { svm, program_id, admin, config, program_data, operator, executor, trader, agent, agent_vault, agent_id }
+    }
+
+    // ---- protocol admin ----
+
+    pub fn init_config_as(&mut self, max_position: u64, max_agent_capital: u64, signer: &Keypair) -> Result<(), String> {
+        let ix = Instruction::new_with_bytes(
+            self.program_id,
+            &proof_of_agent::instruction::InitConfig { max_position, max_agent_capital }.data(),
+            proof_of_agent::accounts::InitConfig {
+                admin: signer.pubkey(),
+                config: self.config,
+                program_data: self.program_data,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+        self.send(ix, signer)
+    }
+
+    fn set_config_accounts(&self, signer: &Keypair) -> Vec<anchor_lang::prelude::AccountMeta> {
+        proof_of_agent::accounts::SetConfig {
+            admin: signer.pubkey(),
+            config: self.config,
+            program_data: self.program_data,
+        }
+        .to_account_metas(None)
+    }
+
+    pub fn set_paused_as(&mut self, paused: bool, signer: &Keypair) -> Result<Vec<String>, String> {
+        let ix = Instruction::new_with_bytes(
+            self.program_id,
+            &proof_of_agent::instruction::SetPaused { paused }.data(),
+            self.set_config_accounts(signer),
+        );
+        self.send_logs(ix, signer)
+    }
+
+    pub fn set_paused(&mut self, paused: bool) -> Result<(), String> {
+        let admin = self.admin.insecure_clone();
+        self.set_paused_as(paused, &admin).map(|_| ())
+    }
+
+    pub fn set_caps_as(&mut self, max_position: u64, max_agent_capital: u64, signer: &Keypair) -> Result<(), String> {
+        let ix = Instruction::new_with_bytes(
+            self.program_id,
+            &proof_of_agent::instruction::SetCaps { max_position, max_agent_capital }.data(),
+            self.set_config_accounts(signer),
+        );
+        self.send(ix, signer)
+    }
+
+    pub fn set_caps(&mut self, max_position: u64, max_agent_capital: u64) -> Result<(), String> {
+        let admin = self.admin.insecure_clone();
+        self.set_caps_as(max_position, max_agent_capital, &admin)
+    }
+
+    pub fn config_state(&self) -> Config {
+        let acc = self.svm.get_account(&self.config).unwrap();
+        Config::try_deserialize(&mut &acc.data[..]).unwrap()
     }
 
     /// A funded keypair that is neither operator, executor nor the default trader.
@@ -279,6 +361,7 @@ impl Env {
                 operator: signer.pubkey(),
                 agent: self.agent,
                 agent_vault: self.agent_vault,
+                config: self.config,
                 system_program: system_program::ID,
             }
             .to_account_metas(None),
@@ -332,6 +415,7 @@ impl Env {
                 agent: self.agent,
                 position,
                 position_vault,
+                config: self.config,
                 system_program: system_program::ID,
             }
             .to_account_metas(None),
@@ -413,6 +497,7 @@ impl Env {
                 agent: self.agent,
                 position,
                 position_vault,
+                config: self.config,
                 system_program: system_program::ID,
             }
             .to_account_metas(None),
@@ -529,6 +614,13 @@ pub const E_ALREADY: u32 = 6020;
 pub const E_NO_COLLATERAL: u32 = 6021;
 pub const E_EXECUTOR: u32 = 6022;
 pub const E_RATIO_DRAWDOWN: u32 = 6023;
+pub const E_PAUSED: u32 = 6024;
+pub const E_TOO_LARGE: u32 = 6025;
+pub const E_AGENT_CAP: u32 = 6026;
+pub const E_ADMIN: u32 = 6027;
+pub const E_CAPS: u32 = 6028;
+/// Anchor's AccountNotInitialized.
+pub const E_NOT_INITIALIZED: u32 = 3012;
 /// Anchor's ConstraintSeeds.
 pub const E_SEEDS: u32 = 2006;
 

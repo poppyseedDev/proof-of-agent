@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { PublicKey } from "@solana/web3.js";
 import { fetchProgramAccounts } from "@/lib/accounts";
 import { useActions } from "@/lib/useProtocol";
-import { AgentAccount, PositionAccount, capacity, feePct, pct, short, sol } from "@/lib/program";
+import { AgentAccount, PositionAccount, ProtocolConfig, capacity, feePct, pct, short, sol } from "@/lib/program";
 import { Avatar } from "@/components/Avatar";
 import { Certificate } from "@/components/Certificate";
 import { TxNotice } from "@/components/TxNotice";
@@ -21,6 +21,7 @@ export default function AgentPage() {
   const actions = useActions();
   const [agent, setAgent] = useState<AgentAccount | null | undefined>(undefined);
   const [positions, setPositions] = useState<PositionAccount[]>([]);
+  const [config, setConfig] = useState<ProtocolConfig | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async (fresh = false) => {
@@ -35,6 +36,7 @@ export default function AgentPage() {
       const snap = await fetchProgramAccounts(fresh);
       const a = snap.agents.find((x) => x.publicKey.equals(pk)) ?? null;
       setAgent(a);
+      setConfig(snap.config);
       setPositions(a ? snap.positions.filter((p) => p.agent.equals(pk)) : []);
       setLoadError(null);
     } catch (e) {
@@ -95,7 +97,7 @@ export default function AgentPage() {
                 <span className="sub">{closed.length} closed · after fees and collateral</span></div>
               <div className="stat"><span className="k">Collateral</span><span className="v">{sol(agent.totalCollateral)}<small>SOL</small></span>
                 <span className="sub">{sol(agent.lockedCollateral)} SOL reserved</span></div>
-              <div className="stat"><span className="k">Capacity left</span><span className="v cy">{sol(capacity(agent))}<small>SOL</small></span>
+              <div className="stat"><span className="k">Capacity left</span><span className="v cy">{sol(capacity(agent, config))}<small>SOL</small></span>
                 <span className="sub">{sol(agent.capitalManaged)} SOL managed now</span></div>
               <div className="stat"><span className="k">Breaches</span>
                 <span className={"v " + (agent.breachCount ? "neg" : "")}>{agent.breachCount}</span>
@@ -146,6 +148,7 @@ export default function AgentPage() {
           <TxNotice tx={actions.tx} />
           <Certificate
             agent={agent}
+            config={config}
             connected={actions.connected}
             busy={actions.tx.kind === "pending"}
             tx={actions.tx}
