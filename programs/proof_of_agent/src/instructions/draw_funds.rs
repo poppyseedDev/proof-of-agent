@@ -40,9 +40,11 @@ pub struct DrawFunds<'info> {
         bump = position.vault_bump
     )]
     pub position_vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+    /// Last, so clients built for the previous program version (which had no
+    /// config) keep working against it: a trailing extra account is ignored.
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_draw_funds(ctx: Context<DrawFunds>) -> Result<()> {

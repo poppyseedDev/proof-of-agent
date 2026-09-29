@@ -455,7 +455,15 @@
           }
         },
         {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
           "name": "config",
+          "docs": [
+            "Last, so clients built for the previous program version (which had no",
+            "config) keep working against it: a trailing extra account is ignored."
+          ],
           "pda": {
             "seeds": [
               {
@@ -471,10 +479,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -600,7 +604,15 @@
           }
         },
         {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
           "name": "config",
+          "docs": [
+            "Last, so clients built for the previous program version (which had no",
+            "config) keep working against it: a trailing extra account is ignored."
+          ],
           "pda": {
             "seeds": [
               {
@@ -616,10 +628,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -869,7 +877,15 @@
           }
         },
         {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
           "name": "config",
+          "docs": [
+            "Last, so clients built for the previous program version (which had no",
+            "config) keep working against it: a trailing extra account is ignored."
+          ],
           "pda": {
             "seeds": [
               {
@@ -885,10 +901,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [

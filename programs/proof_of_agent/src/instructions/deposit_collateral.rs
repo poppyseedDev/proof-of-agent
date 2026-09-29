@@ -24,9 +24,11 @@ pub struct DepositCollateral<'info> {
         bump = agent.vault_bump
     )]
     pub agent_vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+    /// Last, so clients built for the previous program version (which had no
+    /// config) keep working against it: a trailing extra account is ignored.
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_deposit_collateral(ctx: Context<DepositCollateral>, amount: u64) -> Result<()> {
