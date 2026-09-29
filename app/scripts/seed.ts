@@ -22,7 +22,7 @@ const AGENTS = [
     rules: "Holds spot SOL against a short perp of equal size to earn funding.\nCloses both legs if funding turns negative for 24h.\nNo directional exposure beyond 5%." },
   { name: "Degen Sniper", description: "New-launch sniping, high variance", ratio: 1000, fee: 500, drawdown: 5000, window: [HOUR, DAY], assets: [SOL_MINT, USDC_MINT, JUP_MINT], bond: 4,
     rules: "Buys newly listed tokens in the first minutes of trading.\nExits within 6 hours.\nExpect large swings; losses up to 50% are within terms." },
-  { name: "Vault Keeper", description: "Fully bonded LST yield rotation", ratio: 10000, fee: 3000, drawdown: 500, window: [7 * DAY, 90 * DAY], assets: [SOL_MINT], bond: 60,
+  { name: "Vault Keeper", description: "Fully bonded LST yield rotation", ratio: 10000, fee: 3000, drawdown: 0, window: [7 * DAY, 90 * DAY], assets: [SOL_MINT], bond: 60,
     rules: "Rotates between liquid staking tokens for the best yield.\nPrincipal stays in SOL terms.\nFully collateralised: every SOL deposited is backed by a SOL of bond." },
 ];
 
