@@ -164,12 +164,13 @@ None of the following is implemented yet.
 
 ### Vault custody
 
-Funds stay in the position vault, and the agent can only trade them through a
-program instruction that calls Jupiter. Settlement then reads the vault's real
-balance instead of trusting the amount the agent sends. After the deadline,
-anyone can unwind the vault into the deposit token and settle. Because the
-agent can no longer keep the principal, a missed deadline would carry a
-smaller fixed penalty instead of the whole bond.
+Specified in [custody.md](custody.md) and being built on the `vault-custody`
+branch. Funds stay in the position vault, the agent trades them through a
+program instruction that calls an allowlisted DEX, every swap is checked
+against an oracle price, and settlement reads the vault's balance instead of
+trusting the amount the agent sends. A missed deadline then costs a fixed
+penalty instead of the whole bond, because the trader can unwind the vault
+themselves.
 
 ### USDC deposits and a benchmark
 
