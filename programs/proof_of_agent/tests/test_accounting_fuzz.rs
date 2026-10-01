@@ -476,13 +476,18 @@ impl Walk {
         for p in &self.positions {
             self.env.switch_agent(AGENT_IDS[p.agent]);
             let (_, vault) = self.env.position_pda_for(&self.traders[p.trader].pubkey(), p.nonce);
-            // A drawn position's vault keeps its rent floor until the position closes.
+            // While trading, the principal is wrapped in the vault's wSOL account and
+            // the rent floor is parked in the custody account; the vault itself is empty.
             let want = match p.st {
                 St::Open => p.principal + floor,
-                St::Trading => floor,
-                St::Closed => 0,
+                St::Trading | St::Closed => 0,
             };
             assert_eq!(self.env.balance(&vault), want, "position vault {p:?}");
+            if p.st == St::Trading {
+                let (position, _) = self.env.position_pda_for(&self.traders[p.trader].pubkey(), p.nonce);
+                assert_eq!(self.env.vault_wsol_for(&self.traders[p.trader].pubkey(), p.nonce), p.principal, "vault wSOL {p:?}");
+                assert_eq!(self.env.balance(&self.env.custody_pda(&position)), self.env.custody_rent() + floor, "custody {p:?}");
+            }
             let s = self.env.position_state_for(&self.traders[p.trader].pubkey(), p.nonce);
             let st = match s.status {
                 PositionStatus::Open => St::Open,

@@ -235,7 +235,7 @@ fn draw_twice_fails_and_moves_the_principal_once() {
     let (_, vault) = env.position_pda(0);
     let t = env.now();
     env.draw(0, &op).unwrap();
-    assert_eq!(env.balance(&vault), env.rent_floor());
+    assert_eq!(env.balance(&vault), 0);
     let p = env.position_state(0);
     assert_eq!((p.status, p.drawn_at), (PositionStatus::Trading, t));
     let op_bal = env.balance(&op.pubkey());
@@ -243,7 +243,7 @@ fn draw_twice_fails_and_moves_the_principal_once() {
     assert!(env.draw(0, &op).is_err());
     // Only the failed transaction's fee left the operator's wallet.
     assert_eq!(env.balance(&op.pubkey()), op_bal - TX_FEE);
-    assert_eq!(env.balance(&vault), env.rent_floor());
+    assert_eq!(env.balance(&vault), 0);
     assert_eq!(env.vault_wsol(0), SOL);
     // Neither does a different valid executor succeed on a drawn position.
     let k = env.executor.insecure_clone();

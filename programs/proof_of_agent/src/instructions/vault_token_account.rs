@@ -97,12 +97,12 @@ pub struct CloseVaultTokenAccount<'info> {
 }
 
 pub fn handle_close_vault_token_account(ctx: Context<CloseVaultTokenAccount>) -> Result<()> {
-    require!(ctx.accounts.vault_ata.amount == 0, ErrorCode::TokenAccountNotEmpty);
     require!(
         ctx.accounts.mint.key() != native_mint::ID
             || ctx.accounts.position.status != PositionStatus::Trading,
         ErrorCode::WsolAccountInUse
     );
+    require!(ctx.accounts.vault_ata.amount == 0, ErrorCode::TokenAccountNotEmpty);
     let position_key = ctx.accounts.position.key();
     let seeds: &[&[u8]] =
         &[POSITION_VAULT_SEED, position_key.as_ref(), &[ctx.accounts.position.vault_bump]];

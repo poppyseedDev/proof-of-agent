@@ -252,7 +252,11 @@ impl Env {
 
     /// The vault's wSOL balance of a position.
     pub fn vault_wsol(&self, nonce: u64) -> u64 {
-        let (_, vault) = self.position_pda(nonce);
+        self.vault_wsol_for(&self.trader.pubkey(), nonce)
+    }
+
+    pub fn vault_wsol_for(&self, trader: &Pubkey, nonce: u64) -> u64 {
+        let (_, vault) = self.position_pda_for(trader, nonce);
         self.token_balance(&ata(&vault, &WSOL))
     }
 
@@ -445,8 +449,11 @@ impl Env {
     /// Rent the executor pays at `begin_trading`: the custody account and the
     /// vault's wSOL account. Both come back at settlement.
     pub fn custody_rents(&self) -> u64 {
-        let rent = self.svm.get_sysvar::<Rent>();
-        rent.minimum_balance(8 + Custody::INIT_SPACE) + rent.minimum_balance(TOKEN_ACCOUNT_LEN)
+        self.custody_rent() + self.svm.get_sysvar::<Rent>().minimum_balance(TOKEN_ACCOUNT_LEN)
+    }
+
+    pub fn custody_rent(&self) -> u64 {
+        self.svm.get_sysvar::<Rent>().minimum_balance(8 + Custody::INIT_SPACE)
     }
 
     /// Reproduces what the previous program's `draw_funds` did: the principal

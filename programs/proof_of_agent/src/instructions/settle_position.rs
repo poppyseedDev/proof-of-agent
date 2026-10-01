@@ -172,9 +172,10 @@ pub fn handle_settle_position(ctx: Context<SettlePosition>, returned: u64) -> Re
 
     let in_custody = !ctx.accounts.custody.data_is_empty();
     let late_penalty_bps;
-    // Closed at the very end: moving its lamports by hand before a CPI that
+    // Closed at the very end: moving lamports by hand before a CPI that
     // touches the same wallet makes the runtime see an unbalanced instruction.
-    let mut close_custody: Option<(AccountInfo, AccountInfo)> = None;
+    // (custody account, rent payer, lamports parked for the trader)
+    let mut close_custody: Option<(AccountInfo, AccountInfo, u64)> = None;
     let effective_returned = if declined {
         // The agent never drew the funds: the principal is still in the vault
         // and counts as "returned in full" without the agent sending anything.
@@ -225,7 +226,12 @@ pub fn handle_settle_position(ctx: Context<SettlePosition>, returned: u64) -> Re
             position_seeds,
             wsol_rent,
         )?;
-        close_custody = Some((custody_info, rent_payer.to_account_info()));
+        // The vault's rent floor, parked in the custody account, goes to the
+        // trader with the payout; the custody rent goes to whoever paid it.
+        // Both are moved by hand after every CPI (see `close_custody`).
+        let custody_rent = Rent::get()?.minimum_balance(custody_info.data_len());
+        let parked = custody_info.lamports().saturating_sub(custody_rent);
+        close_custody = Some((custody_info, rent_payer.to_account_info(), parked));
 
         let config = ctx
             .accounts
@@ -235,9 +241,18 @@ pub fn handle_settle_position(ctx: Context<SettlePosition>, returned: u64) -> Re
         let (config_key, _) = Pubkey::find_program_address(&[CONFIG_SEED], ctx.program_id);
         require_keys_eq!(config.key(), config_key, ErrorCode::CustodyAccountsMissing);
         late_penalty_bps = config.late_penalty_bps;
-        ctx.accounts.position_vault.lamports().saturating_sub(rent_floor)
+        // The vault held nothing while trading, so everything it holds now
+        // came out of the wSOL account.
+        ctx.accounts.position_vault.lamports()
     } else {
         require!(can_execute, ErrorCode::UnauthorizedExecutor);
+        // A custody position parks the vault's rent floor in its custody
+        // account, so a client that does not know about custody cannot settle
+        // one through this path.
+        require!(
+            ctx.accounts.position_vault.lamports() >= rent_floor,
+            ErrorCode::CustodyAccountsMissing
+        );
         late_penalty_bps = 0;
         super::transfer_from_signer(
             &ctx.accounts.executor.to_account_info(),
@@ -370,7 +385,9 @@ pub fn handle_settle_position(ctx: Context<SettlePosition>, returned: u64) -> Re
         trader_payout: effective_returned - fee + slash,
     });
 
-    if let Some((custody, rent_payer)) = close_custody {
+    if let Some((custody, rent_payer, parked)) = close_custody {
+        **ctx.accounts.trader.to_account_info().try_borrow_mut_lamports()? += parked;
+        **custody.try_borrow_mut_lamports()? -= parked;
         close_account_to(&custody, &rent_payer)?;
     }
     Ok(())

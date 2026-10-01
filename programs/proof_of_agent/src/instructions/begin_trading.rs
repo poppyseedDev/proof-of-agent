@@ -91,6 +91,18 @@ pub fn handle_begin_trading(ctx: Context<BeginTrading>) -> Result<()> {
         seeds,
         position.principal,
     )?;
+    // The vault's rent floor is parked in the custody account until
+    // settlement, so the vault holds nothing while the position trades. The
+    // legacy settle path (a client that predates custody, sending `returned`
+    // from its own wallet) requires the floor to be there, so it cannot be
+    // used on a custody position by mistake.
+    super::transfer_from_vault(
+        &ctx.accounts.position_vault.to_account_info(),
+        &custody.to_account_info(),
+        &ctx.accounts.system_program.to_account_info(),
+        seeds,
+        ctx.accounts.position_vault.lamports(),
+    )?;
     token::sync_native(CpiContext::new(
         ctx.accounts.token_program.key(),
         SyncNative { account: ctx.accounts.vault_wsol.to_account_info() },
