@@ -7,8 +7,9 @@ use crate::{
     state::{Agent, Breach, Position, PositionStatus},
 };
 
-/// The agent drew the funds and did not settle before the deadline. The
-/// trader claims the full locked guarantee from the agent's collateral vault.
+/// The agent drew the funds into its wallet (a position from before vault
+/// custody) and did not settle before the deadline. The trader claims the
+/// full locked guarantee from the agent's collateral vault.
 #[derive(Accounts)]
 pub struct ClaimDefault<'info> {
     #[account(mut)]
@@ -40,12 +41,18 @@ pub struct ClaimDefault<'info> {
     )]
     pub position_vault: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK: the position's custody PDA. It exists only for positions that
+    /// trade under vault custody, which cannot default: the principal is in
+    /// the vault, so the trader unwinds and settles instead.
+    #[account(seeds = [CUSTODY_SEED, position.key().as_ref()], bump)]
+    pub custody: UncheckedAccount<'info>,
 }
 
 pub fn handle_claim_default(ctx: Context<ClaimDefault>) -> Result<()> {
     let position = &mut ctx.accounts.position;
     let agent = &mut ctx.accounts.agent;
     require!(position.status == PositionStatus::Trading, ErrorCode::InvalidStatus);
+    require!(ctx.accounts.custody.data_is_empty(), ErrorCode::UseSettle);
     let now = Clock::get()?.unix_timestamp;
     require!(now >= position.deadline, ErrorCode::DeadlineNotReached);
 

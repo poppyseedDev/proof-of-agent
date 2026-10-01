@@ -134,7 +134,9 @@ fn bound_trading_key_can_draw_and_settle_but_strangers_cannot() {
     assert_err(env.draw(0, &stranger), E_EXECUTOR);
     let before = env.balance(&executor.pubkey());
     env.draw(0, &executor).unwrap();
-    assert_eq!(env.balance(&executor.pubkey()) - before + TX_FEE, SOL);
+    // The principal stays in the vault; the executor only put up the rent.
+    assert_eq!(before - env.balance(&executor.pubkey()), TX_FEE + env.custody_rents());
+    assert_eq!(env.vault_wsol(0), SOL);
 
     assert_err(env.settle(0, SOL, &stranger), E_EXECUTOR);
     // Profit: 1.2 SOL back, 15% of 0.2 goes to the operator, not the executor.
@@ -217,10 +219,12 @@ fn loss_beyond_tolerance_is_a_breach_and_slashes_up_to_the_bond() {
 
 #[test]
 fn missed_deadline_is_a_breach_and_pays_the_whole_reservation() {
+    // A legacy position: the previous program's draw_funds moved the principal
+    // to the operator's wallet, so a missed deadline forfeits the whole bond.
     let mut env = Env::launched();
     let op = env.op();
     env.open(0, SOL, 3_600).unwrap();
-    env.draw(0, &op).unwrap();
+    env.legacy_draw(0, &op.pubkey());
     assert_err(env.claim_default(0), E_NOT_REACHED);
     env.advance_time(3_601);
     let before = env.balance(&env.trader.pubkey());
@@ -233,7 +237,13 @@ fn missed_deadline_is_a_breach_and_pays_the_whole_reservation() {
     let a = env.agent_state();
     assert_eq!(a.breach_count, 1);
     assert_eq!(a.defaulted_positions, 1);
-    assert_err(env.settle(0, SOL, &op), E_STATUS);
+    assert_err(env.legacy_settle(0, SOL, &op), E_STATUS);
+
+    // A custody position cannot default: its principal is in the vault.
+    env.open(1, SOL, 60).unwrap();
+    env.draw(1, &op).unwrap();
+    env.advance_time(61);
+    assert_err(env.claim_default(1), E_USE_SETTLE);
 }
 
 #[test]
@@ -388,7 +398,7 @@ fn claim_default_deadline_boundary_is_exact() {
     let mut env = Env::launched();
     let op = env.op();
     env.open(0, SOL, 3_600).unwrap();
-    env.draw(0, &op).unwrap();
+    env.legacy_draw(0, &op.pubkey());
     let deadline = env.position_state(0).deadline;
 
     env.set_time(deadline - 1);
@@ -484,6 +494,8 @@ fn a_position_cannot_be_used_with_another_agent() {
     env.open(0, SOL, 3_600).unwrap();
     let (pos_a, vault_a) = env.position_pda(0);
     let (agent_a, agent_vault_a) = (env.agent, env.agent_vault);
+    // Drawn the legacy way, so the default claim at the end still applies.
+    env.legacy_draw(0, &op.pubkey());
 
     // Agent B: same operator, another id, published and funded.
     env.switch_agent(8);
@@ -523,9 +535,8 @@ fn a_position_cannot_be_used_with_another_agent() {
     let trader = env.trader.insecure_clone();
     assert_err(env.send(cancel_b, &trader), E_SEEDS);
 
-    // Draw it properly on A, then try to settle / claim it through B.
+    // Try to settle / claim A's drawn position through B.
     env.switch_agent(7);
-    env.draw(0, &op).unwrap();
     let mut accounts = env.settle_accounts(0, &op);
     accounts.agent = agent_b;
     accounts.agent_vault = agent_vault_b;
@@ -547,6 +558,7 @@ fn a_position_cannot_be_used_with_another_agent() {
             position: pos_a,
             position_vault: vault_a,
             system_program: system_program::ID,
+            custody: env.custody_pda(&pos_a),
         }
         .to_account_metas(None),
     );
@@ -568,7 +580,7 @@ fn settle_rejects_a_wrong_trader_or_operator_recipient() {
     let stranger = Keypair::new();
     env.svm.airdrop(&stranger.pubkey(), SOL).unwrap();
     env.open(0, SOL, 3_600).unwrap();
-    env.draw(0, &op).unwrap();
+    env.legacy_draw(0, &op.pubkey());
 
     let mut accounts = env.settle_accounts(0, &op);
     accounts.trader = stranger.pubkey();
@@ -591,6 +603,7 @@ fn settle_rejects_a_wrong_trader_or_operator_recipient() {
             position,
             position_vault,
             system_program: system_program::ID,
+            custody: env.custody_pda(&position),
         }
         .to_account_metas(None),
     );
@@ -626,21 +639,10 @@ fn draw_and_set_accepting_emit_events() {
     let mut env = Env::launched();
     let op = env.op();
     env.open(0, SOL, 3_600).unwrap();
-    let (position, position_vault) = env.position_pda(0);
+    let (position, _) = env.position_pda(0);
     let deadline = env.position_state(0).deadline;
-    let ix = Instruction::new_with_bytes(
-        env.program_id,
-        &proof_of_agent::instruction::DrawFunds {}.data(),
-        proof_of_agent::accounts::DrawFunds {
-            executor: op.pubkey(),
-            agent: env.agent,
-            position,
-            position_vault,
-            config: env.config,
-            system_program: system_program::ID,
-        }
-        .to_account_metas(None),
-    );
+    env.create_native_mint();
+    let ix = env.begin_trading_ix(&env.trader.pubkey(), 0, &op.pubkey());
     let logs = env.send_logs(ix, &op).unwrap();
     assert!(has_event(
         &logs,

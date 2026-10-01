@@ -1,6 +1,11 @@
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 
-use crate::{constants::*, error::ErrorCode, events::ConfigChanged, state::Config};
+use crate::{
+    constants::*,
+    error::ErrorCode,
+    events::{ConfigChanged, TradingConfigChanged},
+    state::{Config, FeedMapping},
+};
 
 // The admin is whoever holds the program's upgrade authority, read from its
 // ProgramData account on every call. Moving the upgrade authority (to a
@@ -58,7 +63,49 @@ pub fn handle_init_config(ctx: Context<InitConfig>, max_position: u64, max_agent
     config.max_position = max_position;
     config.max_agent_capital = max_agent_capital;
     config.bump = ctx.bumps.config;
+    // No DEX, no oracle, no feeds: nothing can trade until set_trading_config.
+    config.allowed_dex_programs = Vec::new();
+    config.oracle_program = Pubkey::default();
+    config.max_price_age_secs = 60;
+    config.max_swap_deviation_bps = 0;
+    config.late_penalty_bps = 0;
+    config.feeds = Vec::new();
     emit_changed(config);
+    Ok(())
+}
+
+/// What custody positions may trade through, and how a swap is priced.
+pub fn handle_set_trading_config(
+    ctx: Context<SetConfig>,
+    allowed_dex_programs: Vec<Pubkey>,
+    oracle_program: Pubkey,
+    max_price_age_secs: i64,
+    max_swap_deviation_bps: u16,
+    late_penalty_bps: u16,
+    feeds: Vec<FeedMapping>,
+) -> Result<()> {
+    Config::validate_trading(
+        &allowed_dex_programs,
+        max_price_age_secs,
+        max_swap_deviation_bps,
+        late_penalty_bps,
+        &feeds,
+    )?;
+    let config = &mut ctx.accounts.config;
+    config.allowed_dex_programs = allowed_dex_programs;
+    config.oracle_program = oracle_program;
+    config.max_price_age_secs = max_price_age_secs;
+    config.max_swap_deviation_bps = max_swap_deviation_bps;
+    config.late_penalty_bps = late_penalty_bps;
+    config.feeds = feeds;
+    emit!(TradingConfigChanged {
+        allowed_dex_programs: config.allowed_dex_programs.clone(),
+        oracle_program,
+        max_price_age_secs,
+        max_swap_deviation_bps,
+        late_penalty_bps,
+        feed_count: config.feeds.len() as u8,
+    });
     Ok(())
 }
 

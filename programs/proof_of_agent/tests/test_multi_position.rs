@@ -116,8 +116,8 @@ fn interleaved_positions_from_two_traders_keep_the_counters_consistent() {
     assert_err(env.open_by(&a, 2, 4_000_000_001, 3_600), E_INSUFFICIENT);
     check(&env, &m);
 
-    // 6. B1 is drawn and misses its 60 s deadline; B claims the default.
-    env.draw_for(&bk, 1, &key).unwrap();
+    // 6. B1 was drawn the legacy way and misses its 60 s deadline; B claims the default.
+    env.legacy_draw_for(&bk, 1, &key.pubkey());
     env.advance_time(60);
     let b_before = env.balance(&bk);
     env.claim_default_by(&b, 1).unwrap();
@@ -188,7 +188,7 @@ fn a_trader_cannot_touch_another_traders_position() {
     let a = env.tr();
     let b = env.funded(10 * SOL);
     env.open_by(&a, 0, SOL, 60).unwrap();
-    env.draw(0, &op).unwrap();
+    env.legacy_draw_for(&a.pubkey(), 0, &op.pubkey());
     env.advance_time(60);
 
     // B passes A's position with B as signer: the PDA seeds use B's key.
@@ -295,18 +295,25 @@ fn random_walk_over_positions_keeps_the_invariants() {
                         hits[3] += 1;
                     }
                     (1, PositionStatus::Trading) if late => {
-                        env.claim_default_by(&traders[t], n).unwrap();
-                        m.total -= p.locked_collateral;
+                        // A custody position cannot default; the trader settles it late instead.
+                        assert_err(env.claim_default_by(&traders[t], n), E_USE_SETTLE);
+                        let returned = rng.range(0, 2 * p.principal);
+                        env.settle_for(&tk, n, returned, &traders[t]).unwrap();
+                        let s = env.position_state_for(&tk, n);
+                        assert_eq!((s.status, s.breach), (PositionStatus::Settled, Breach::MissedDeadline));
+                        assert!(s.slashed <= p.locked_collateral);
+                        m.total -= s.slashed;
                         m.locked -= p.locked_collateral;
                         m.capital -= p.principal;
                         m.open -= 1;
-                        m.defaulted += 1;
+                        m.settled += 1;
                         m.breaches += 1;
-                        m.slashed += p.locked_collateral;
+                        m.slashed += s.slashed;
+                        m.fees += s.fee_paid;
                         hits[4] += 1;
                     }
                     (1, PositionStatus::Trading) => {
-                        assert_err(env.claim_default_by(&traders[t], n), E_NOT_REACHED);
+                        assert_err(env.claim_default_by(&traders[t], n), E_USE_SETTLE);
                         assert_err(env.cancel_by(&traders[t], n), E_STATUS);
                     }
                     (_, PositionStatus::Trading) => env.advance_time(rng.range(1, 3_600) as i64),

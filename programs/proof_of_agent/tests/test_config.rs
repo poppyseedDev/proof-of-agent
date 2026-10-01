@@ -122,10 +122,12 @@ fn pause_never_stops_money_going_back() {
     assert_eq!(env.position_state(3).status, PositionStatus::Settled);
     // The agent settles a drawn position.
     env.settle(0, SOL / 2, &op).unwrap();
-    // A drawn position left past its deadline can still be claimed.
+    // A drawn position left past its deadline can still be settled by the trader.
     env.advance_time(3_601);
-    env.claim_default(1).unwrap();
-    assert_eq!(env.position_state(1).status, PositionStatus::Defaulted);
+    let tr = env.tr();
+    env.settle(1, SOL / 2, &tr).unwrap();
+    let p = env.position_state(1);
+    assert_eq!((p.status, p.breach), (PositionStatus::Settled, Breach::MissedDeadline));
     // The operator withdraws what is left.
     let free = env.agent_state().free_collateral();
     env.withdraw(free).unwrap();

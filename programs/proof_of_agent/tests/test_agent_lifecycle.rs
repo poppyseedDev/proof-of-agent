@@ -345,14 +345,17 @@ fn pausing_blocks_new_positions_but_not_existing_ones() {
     env.settle(0, SOL, &op).unwrap();
     env.settle(1, SOL / 2, &op).unwrap();
     env.advance_time(3_600);
-    env.claim_default(2).unwrap();
+    // Past its deadline, the trader settles the position the agent left behind.
+    let tr = env.tr();
+    env.settle(2, SOL, &tr).unwrap();
+    assert_eq!(env.position_state(2).breach, Breach::MissedDeadline);
     // The operator can still manage collateral while paused.
     env.deposit(SOL).unwrap();
     env.withdraw(SOL / 2).unwrap();
     env.check_invariants();
 
     let a = env.agent_state();
-    assert_counters(&a, 0, 2, 1, 2);
+    assert_counters(&a, 0, 3, 0, 2);
     assert_eq!(a.locked_collateral, 0);
     assert_eq!(a.capital_managed, 0);
 
@@ -403,10 +406,12 @@ fn rotating_the_trading_key_revokes_the_old_one() {
     // The old key can neither draw a new position nor settle the one it drew.
     assert_err(env.draw(1, &k1), E_EXECUTOR);
     assert_err(env.settle(0, SOL, &k1), E_EXECUTOR);
-    // The new key settles the position the old key drew, paying from its own wallet.
-    let before = env.balance(&k2.pubkey());
+    // The new key settles the position the old key drew. The principal is in
+    // the vault, so it pays only the fee; the rent the old key put up goes back to it.
+    let (before, k1_before) = (env.balance(&k2.pubkey()), env.balance(&k1.pubkey()));
     env.settle(0, SOL, &k2).unwrap();
-    assert_eq!(before - env.balance(&k2.pubkey()), SOL + TX_FEE);
+    assert_eq!(before - env.balance(&k2.pubkey()), TX_FEE);
+    assert_eq!(env.balance(&k1.pubkey()) - k1_before, env.custody_rents());
     env.draw(1, &k2).unwrap();
 
     // Rebinding to the operator's own key leaves the operator as sole executor.

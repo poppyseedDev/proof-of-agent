@@ -4,6 +4,9 @@
 //! these helpers, hence the `dead_code` allowance.
 #![allow(dead_code, unused_imports)]
 
+pub mod custody;
+pub use custody::*;
+
 pub use {
     anchor_lang::{
         prelude::{Clock, Pubkey, Rent},
@@ -172,7 +175,10 @@ impl Env {
         let blockhash = self.svm.latest_blockhash();
         let msg = Message::new_with_blockhash(&[ix], Some(&signer.pubkey()), &blockhash);
         let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[signer]).unwrap();
-        self.svm.send_transaction(tx).map(|m| m.logs).map_err(|e| format!("{:?}", e.err))
+        self.svm
+            .send_transaction(tx)
+            .map(|m| m.logs)
+            .map_err(|e| format!("{:?}\n{}", e.err, e.meta.logs.join("\n")))
     }
 
     /// Point the helpers at another agent owned by the same operator.
@@ -239,6 +245,10 @@ impl Env {
         self.position_pda_for(&self.trader.pubkey(), nonce)
     }
 
+    pub fn custody_pda(&self, position: &Pubkey) -> Pubkey {
+        Pubkey::find_program_address(&[CUSTODY_SEED, position.as_ref()], &self.program_id).0
+    }
+
     pub fn position_state_for(&self, trader: &Pubkey, nonce: u64) -> Position {
         let acc = self.svm.get_account(&self.position_pda_for(trader, nonce).0).unwrap();
         Position::try_deserialize(&mut &acc.data[..]).unwrap()
@@ -246,6 +256,11 @@ impl Env {
 
     pub fn position_state(&self, nonce: u64) -> Position {
         self.position_state_for(&self.trader.pubkey(), nonce)
+    }
+
+    pub fn position_by_key(&self, key: &Pubkey) -> Option<Position> {
+        let acc = self.svm.get_account(key)?;
+        Position::try_deserialize(&mut &acc.data[..]).ok()
     }
 
     pub fn op(&self) -> Keypair {
@@ -422,9 +437,16 @@ impl Env {
         )
     }
 
-    pub fn draw_for(&mut self, trader: &Pubkey, nonce: u64, signer: &Keypair) -> Result<(), String> {
-        let ix = self.draw_ix(trader, nonce, &signer.pubkey());
+    /// Sends the disabled `draw_funds` instruction.
+    pub fn draw_funds_legacy(&mut self, nonce: u64, signer: &Keypair) -> Result<(), String> {
+        let trader = self.trader.pubkey();
+        let ix = self.draw_ix(&trader, nonce, &signer.pubkey());
         self.send(ix, signer)
+    }
+
+    /// Starts trading under vault custody (what `draw_funds` used to do).
+    pub fn draw_for(&mut self, trader: &Pubkey, nonce: u64, signer: &Keypair) -> Result<(), String> {
+        self.begin_trading_for(trader, nonce, signer)
     }
 
     pub fn draw(&mut self, nonce: u64, signer: &Keypair) -> Result<(), String> {
@@ -432,6 +454,8 @@ impl Env {
         self.draw_for(&trader, nonce, signer)
     }
 
+    /// Settle accounts for a position: the custody set when the position is
+    /// trading under custody, the legacy set otherwise.
     pub fn settle_accounts_for(
         &self,
         trader: &Pubkey,
@@ -439,6 +463,9 @@ impl Env {
         signer: &Keypair,
     ) -> proof_of_agent::accounts::SettlePosition {
         let (position, position_vault) = self.position_pda_for(trader, nonce);
+        if let Some(c) = self.custody_state(&position) {
+            return self.custody_settle_accounts_for(trader, nonce, &signer.pubkey(), &c.rent_payer);
+        }
         proof_of_agent::accounts::SettlePosition {
             executor: signer.pubkey(),
             operator: self.operator.pubkey(),
@@ -448,6 +475,11 @@ impl Env {
             position_vault,
             trader: *trader,
             system_program: system_program::ID,
+            custody: self.custody_pda(&position),
+            vault_wsol: None,
+            rent_payer: None,
+            token_program: None,
+            config: None,
         }
     }
 
@@ -455,7 +487,26 @@ impl Env {
         self.settle_accounts_for(&self.trader.pubkey(), nonce, signer)
     }
 
+    /// Sends a settle. For a position in custody, the vault's wSOL is set to
+    /// `returned` first, standing in for the agent's trades.
     pub fn settle_with(
+        &mut self,
+        accounts: proof_of_agent::accounts::SettlePosition,
+        returned: u64,
+        signer: &Keypair,
+    ) -> Result<Vec<String>, String> {
+        if self.custody_state(&accounts.position).is_some() {
+            if let Some(p) = self.position_by_key(&accounts.position) {
+                if p.status == PositionStatus::Trading {
+                    self.set_vault_wsol(&p.trader, p.nonce, returned);
+                }
+            }
+        }
+        self.settle_send(accounts, returned, signer)
+    }
+
+    /// Sends a settle with `returned` as the argument and nothing else.
+    pub fn settle_send(
         &mut self,
         accounts: proof_of_agent::accounts::SettlePosition,
         returned: u64,
@@ -469,6 +520,9 @@ impl Env {
         self.send_logs(ix, signer)
     }
 
+    /// Settles a position. A Trading position is in custody: the vault's wSOL
+    /// is set to `returned` first, standing in for the agent's trades, and the
+    /// program reads it. An Open position is declined and `returned` is ignored.
     pub fn settle_for(
         &mut self,
         trader: &Pubkey,
@@ -483,6 +537,13 @@ impl Env {
     pub fn settle(&mut self, nonce: u64, returned: u64, signer: &Keypair) -> Result<(), String> {
         let trader = self.trader.pubkey();
         self.settle_for(&trader, nonce, returned, signer)
+    }
+
+    /// The legacy settle: the signer sends `returned` lamports. For positions
+    /// drawn by the previous program's `draw_funds`, see `legacy_draw`.
+    pub fn legacy_settle(&mut self, nonce: u64, returned: u64, signer: &Keypair) -> Result<(), String> {
+        let accounts = self.settle_accounts(nonce, signer);
+        self.settle_with(accounts, returned, signer).map(|_| ())
     }
 
     // ---- trader ----
@@ -526,6 +587,7 @@ impl Env {
                 position,
                 position_vault,
                 system_program: system_program::ID,
+                custody: self.custody_pda(&position),
             }
             .to_account_metas(None),
         )
@@ -621,6 +683,8 @@ pub const E_ADMIN: u32 = 6027;
 pub const E_CAPS: u32 = 6028;
 /// Anchor's AccountNotInitialized.
 pub const E_NOT_INITIALIZED: u32 = 3012;
+/// The system program's "insufficient lamports" on a transfer.
+pub const E_SYSTEM_INSUFFICIENT: u32 = 1;
 /// Anchor's ConstraintSeeds.
 pub const E_SEEDS: u32 = 2006;
 
@@ -729,3 +793,27 @@ pub fn one_event<E: Event + anchor_lang::AnchorDeserialize>(logs: &[String]) -> 
     assert_eq!(v.len(), 1, "expected exactly one event");
     v.pop().unwrap()
 }
+
+// Vault custody errors, appended in declaration order.
+pub const E_DRAW_DISABLED: u32 = 6029;
+pub const E_USE_SETTLE: u32 = 6030;
+pub const E_DEX_NOT_ALLOWED: u32 = 6031;
+pub const E_MINT_NOT_ALLOWED: u32 = 6032;
+pub const E_NOT_UNWOUND: u32 = 6033;
+pub const E_TOO_MUCH_IN: u32 = 6034;
+pub const E_TOO_LITTLE_OUT: u32 = 6035;
+pub const E_BELOW_ORACLE: u32 = 6036;
+pub const E_ORACLE_INVALID: u32 = 6037;
+pub const E_ORACLE_FEED: u32 = 6038;
+pub const E_ORACLE_STALE: u32 = 6039;
+pub const E_ORACLE_UNVERIFIED: u32 = 6040;
+pub const E_ORACLE_PRICE: u32 = 6041;
+pub const E_TAMPERED: u32 = 6042;
+pub const E_EXTRA_VAULT_ACCOUNT: u32 = 6043;
+pub const E_SAME_MINT: u32 = 6044;
+pub const E_NOT_EMPTY: u32 = 6045;
+pub const E_TRADING_CONFIG: u32 = 6046;
+pub const E_ONLY_UNWIND: u32 = 6047;
+pub const E_NO_FEED: u32 = 6048;
+pub const E_WSOL_IN_USE: u32 = 6049;
+pub const E_CUSTODY_MISSING: u32 = 6050;

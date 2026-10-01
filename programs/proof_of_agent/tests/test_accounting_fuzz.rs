@@ -66,6 +66,9 @@ struct Walk {
     max_agent: u64,
     /// Accounts whose lamports are summed for the conservation check.
     tracked: Vec<Pubkey>,
+    /// Lamports the last step conjured or destroyed in the vault's wSOL account
+    /// to stand in for the agent's trading result.
+    minted: i128,
     /// How often each kind of step succeeded / was refused as predicted.
     ok: [u32; 10],
     refused: [u32; 10],
@@ -121,6 +124,7 @@ impl Walk {
             max_position: u64::MAX,
             max_agent: u64::MAX,
             tracked,
+            minted: 0,
             ok: [0; 10],
             refused: [0; 10],
         }
@@ -149,7 +153,8 @@ impl Walk {
             30..=44 => self.draw(),
             45..=56 => self.settle(),
             57..=63 => self.cancel(),
-            64..=75 => self.claim(),
+            64..=69 => self.claim(),
+            70..=75 => self.late_settle(),
             76..=81 => {
                 self.env.advance_time(self.rng.range(1, 3_600) as i64);
                 None
@@ -194,6 +199,9 @@ impl Walk {
             Some(E_DURATION)
         } else if locked > free {
             Some(E_INSUFFICIENT)
+        } else if amount.saturating_add(self.env.rent_floor()).saturating_add(TX_FEE) > self.env.balance(&self.traders[t].pubkey()) {
+            // Every program check passed; the system transfer of the principal fails.
+            Some(E_SYSTEM_INSUFFICIENT)
         } else {
             None
         };
@@ -214,6 +222,9 @@ impl Walk {
                 self.next_nonce[a][t] += 1;
                 self.tracked.push(position);
                 self.tracked.push(vault);
+                // Created at begin_trading, closed at settle; both hold lamports in between.
+                self.tracked.push(self.env.custody_pda(&position));
+                self.tracked.push(ata(&vault, &WSOL));
                 let m = &mut self.agents[a];
                 m.locked += locked;
                 m.capital += amount;
@@ -247,7 +258,8 @@ impl Walk {
             assert_err(res, E_DEADLINE_PASSED);
         } else {
             res.unwrap();
-            assert_eq!(self.env.balance(&signer.pubkey()) + TX_FEE, before + p.principal);
+            // The principal is wrapped in the vault; the signer only put up the rent.
+            assert_eq!(before - self.env.balance(&signer.pubkey()), TX_FEE + self.env.custody_rents());
             self.positions[i].st = St::Trading;
             self.ok[DRAW] += 1;
             return Some(true);
@@ -265,19 +277,24 @@ impl Walk {
         let trader = self.traders[p.trader].pubkey();
         let operator = self.env.operator.pubkey();
         let declined = p.st == St::Open;
-        let spendable = self.env.balance(&signer.pubkey()).saturating_sub(SOL);
-        let returned = self.rng.range(0, (2 * p.principal).min(spendable));
+        let returned = self.rng.range(0, 2 * p.principal);
         let effective = if declined { p.principal } else { returned };
         let s = compute_settlement(p.principal, effective, fee_bps, dd_bps, p.locked).unwrap();
 
         let (trader_before, operator_before) = (self.env.balance(&trader), self.env.balance(&operator));
+        // The harness sets the vault's wSOL from the principal to `returned`.
+        if !declined {
+            self.minted = returned as i128 - p.principal as i128;
+        }
         self.env.settle_for(&trader, p.nonce, returned, &signer).unwrap();
 
         // Every wallet is well funded, so the fee is always paid out.
         let payout = effective - s.fee + s.slash + self.env.rent_floor();
         assert_eq!(self.env.balance(&trader), trader_before + payout, "trader payout");
         let operator_fee_paid = if signer.pubkey() == operator { TX_FEE } else { 0 };
-        let operator_after_expected = operator_before + s.fee - operator_fee_paid - if declined || signer.pubkey() != operator { 0 } else { returned };
+        // The signer that drew the position paid its custody rent and gets it back now.
+        let rent_refund = if declined || signer.pubkey() != operator { 0 } else { self.env.custody_rents() };
+        let operator_after_expected = operator_before + s.fee - operator_fee_paid + rent_refund;
         assert_eq!(self.env.balance(&operator), operator_after_expected, "operator balance");
 
         let m = &mut self.agents[p.agent];
@@ -326,22 +343,56 @@ impl Walk {
         let res = self.env.claim_default_by(&trader, p.nonce);
         if p.st == St::Open {
             assert_err(res, E_STATUS);
-        } else if self.env.now() < p.deadline {
-            assert_err(res, E_NOT_REACHED);
         } else {
-            res.unwrap();
-            assert_eq!(self.env.balance(&trader.pubkey()) + TX_FEE, before + p.locked + self.env.rent_floor());
-            let m = &mut self.agents[p.agent];
-            m.total -= p.locked;
-            m.locked -= p.locked;
-            m.capital -= p.principal;
-            m.open -= 1;
-            self.positions[i].st = St::Closed;
-            self.ok[CLAIM] += 1;
-            return Some(true);
+            // Custody positions never default: the principal is in the vault.
+            assert_err(res, E_USE_SETTLE);
+            assert_eq!(self.env.balance(&trader.pubkey()) + TX_FEE, before);
         }
         self.refused[CLAIM] += 1;
         Some(false)
+    }
+
+    /// What replaces a default under custody: past the deadline, the trader
+    /// settles the position from the vault. Modelled like a settle, with the
+    /// trader as signer and the rent going back to whoever began trading.
+    fn late_settle(&mut self) -> Option<bool> {
+        let i = self.pick(&[St::Trading])?;
+        let p = self.positions[i].clone();
+        if self.env.now() < p.deadline {
+            return None;
+        }
+        let (_, fee_bps, dd_bps) = TERMS[p.agent];
+        self.env.switch_agent(AGENT_IDS[p.agent]);
+        let trader = self.traders[p.trader].insecure_clone();
+        let payer = self.signer_for(p.agent).pubkey();
+        let operator = self.env.operator.pubkey();
+        let returned = self.rng.range(0, 2 * p.principal);
+        let s = compute_settlement(p.principal, returned, fee_bps, dd_bps, p.locked).unwrap();
+        let (trader_before, payer_before, operator_before) =
+            (self.env.balance(&trader.pubkey()), self.env.balance(&payer), self.env.balance(&operator));
+        self.minted = returned as i128 - p.principal as i128;
+        self.env.settle_for(&trader.pubkey(), p.nonce, returned, &trader).unwrap();
+
+        let payout = returned - s.fee + s.slash + self.env.rent_floor();
+        assert_eq!(self.env.balance(&trader.pubkey()) + TX_FEE, trader_before + payout, "trader payout");
+        let rents = self.env.custody_rents();
+        if payer == operator {
+            assert_eq!(self.env.balance(&operator), operator_before + s.fee + rents, "operator fee and rent");
+        } else {
+            assert_eq!(self.env.balance(&payer), payer_before + rents, "rent refund");
+            assert_eq!(self.env.balance(&operator), operator_before + s.fee, "operator fee");
+        }
+        let st = self.env.position_state_for(&trader.pubkey(), p.nonce);
+        assert_eq!((st.status, st.breach), (PositionStatus::Settled, Breach::MissedDeadline));
+
+        let m = &mut self.agents[p.agent];
+        m.total -= s.slash;
+        m.locked -= p.locked;
+        m.capital -= p.principal;
+        m.open -= 1;
+        self.positions[i].st = St::Closed;
+        self.ok[CLAIM] += 1;
+        Some(true)
     }
 
     fn collateral(&mut self) -> bool {
@@ -449,9 +500,10 @@ fn walk(seed: u64, steps: usize) -> Walk {
     let mut w = Walk::new(seed);
     w.check();
     for _ in 0..steps {
+        w.minted = 0;
         let before = w.total_lamports();
         let sent = w.step();
-        let after = w.total_lamports();
+        let after = (w.total_lamports() as i128 - w.minted) as u64;
         match sent {
             // One signer per transaction: the network fee is the only SOL that leaves.
             Some(true) => assert_eq!(before - after, TX_FEE, "seed {seed}: SOL created or lost"),

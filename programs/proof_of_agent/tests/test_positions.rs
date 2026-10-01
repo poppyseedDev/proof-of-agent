@@ -239,14 +239,17 @@ fn draw_twice_fails_and_moves_the_principal_once() {
     let p = env.position_state(0);
     assert_eq!((p.status, p.drawn_at), (PositionStatus::Trading, t));
     let op_bal = env.balance(&op.pubkey());
-    assert_err(env.draw(0, &op), E_STATUS);
+    // The custody account already exists, so the second draw fails before the handler.
+    assert!(env.draw(0, &op).is_err());
     // Only the failed transaction's fee left the operator's wallet.
     assert_eq!(env.balance(&op.pubkey()), op_bal - TX_FEE);
     assert_eq!(env.balance(&vault), env.rent_floor());
+    assert_eq!(env.vault_wsol(0), SOL);
     // Neither does a different valid executor succeed on a drawn position.
     let k = env.executor.insecure_clone();
     env.bind_executor(k.pubkey(), &op).unwrap();
-    assert_err(env.draw(0, &k), E_STATUS);
+    assert!(env.draw(0, &k).is_err());
+    assert_eq!(env.position_state(0).status, PositionStatus::Trading);
 }
 
 #[test]
@@ -290,11 +293,12 @@ fn draw_after_cancel_settle_or_default_fails() {
     env.open(3, SOL / 10, 60).unwrap();
     env.draw(3, &op).unwrap();
     env.advance_time(60);
-    env.claim_default(3).unwrap();
+    let tr = env.tr();
+    env.settle(3, SOL / 10, &tr).unwrap(); // the trader settles it late
     assert_err(env.draw(3, &op), E_STATUS);
 
     let a = env.agent_state();
-    assert_counters(&a, 0, 1, 1, 1);
+    assert_counters(&a, 0, 2, 0, 1);
     assert_eq!(a.locked_collateral, 0);
     env.check_invariants();
 }

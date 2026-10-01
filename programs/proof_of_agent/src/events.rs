@@ -103,3 +103,33 @@ pub struct ConfigChanged {
     pub max_position: u64,
     pub max_agent_capital: u64,
 }
+
+/// The upgrade authority changed what custody positions may trade.
+#[event]
+pub struct TradingConfigChanged {
+    pub allowed_dex_programs: Vec<Pubkey>,
+    pub oracle_program: Pubkey,
+    pub max_price_age_secs: i64,
+    pub max_swap_deviation_bps: u16,
+    pub late_penalty_bps: u16,
+    pub feed_count: u8,
+}
+
+/// A custody position swapped between two of its vault token accounts.
+/// `value_in` and `value_out` are the oracle values of the two legs, in the
+/// output mint's units scaled to the same exponent, so their ratio is the
+/// price the swap got relative to the oracle.
+#[event]
+pub struct SwapExecuted {
+    pub position: Pubkey,
+    pub agent: Pubkey,
+    pub executor: Pubkey,
+    pub dex_program: Pubkey,
+    pub mint_in: Pubkey,
+    pub mint_out: Pubkey,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub value_in: u128,
+    pub value_out: u128,
+    pub held_mask: u8,
+}

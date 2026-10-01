@@ -1,29 +1,35 @@
+pub mod begin_trading;
 pub mod cancel_position;
 pub mod claim_default;
 pub mod config;
 pub mod create_agent;
 pub mod deposit_collateral;
 pub mod draw_funds;
+pub mod execute_swap;
 pub mod open_position;
 pub mod publish_agent;
 pub mod set_accepting;
 pub mod set_executor;
 pub mod settle_position;
 pub mod update_agent;
+pub mod vault_token_account;
 pub mod withdraw_collateral;
 
+pub use begin_trading::*;
 pub use cancel_position::*;
 pub use claim_default::*;
 pub use config::*;
 pub use create_agent::*;
 pub use deposit_collateral::*;
 pub use draw_funds::*;
+pub use execute_swap::*;
 pub use open_position::*;
 pub use publish_agent::*;
 pub use set_accepting::*;
 pub use set_executor::*;
 pub use settle_position::*;
 pub use update_agent::*;
+pub use vault_token_account::*;
 pub use withdraw_collateral::*;
 
 use anchor_lang::prelude::*;

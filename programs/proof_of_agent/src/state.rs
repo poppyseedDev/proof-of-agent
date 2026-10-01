@@ -204,11 +204,97 @@ pub struct Config {
     /// Largest principal one agent may manage across its open positions, in lamports.
     pub max_agent_capital: u64,
     pub bump: u8,
+    /// Programs `execute_swap` may call. Empty means no position can trade.
+    #[max_len(MAX_DEX_PROGRAMS)]
+    pub allowed_dex_programs: Vec<Pubkey>,
+    /// Owner every price update account must have (the Pyth receiver program).
+    pub oracle_program: Pubkey,
+    /// Oldest publish time a swap may be priced with, in seconds.
+    pub max_price_age_secs: i64,
+    /// Largest loss of oracle value one swap may take, in bps.
+    pub max_swap_deviation_bps: u16,
+    /// Share of the locked bond paid to the trader when a custody position
+    /// settles at or after its deadline, in bps.
+    pub late_penalty_bps: u16,
+    /// Which oracle feed prices which mint. A mint without a feed cannot be traded.
+    #[max_len(MAX_FEEDS)]
+    pub feeds: Vec<FeedMapping>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
+pub struct FeedMapping {
+    pub mint: Pubkey,
+    /// Pyth feed id (32 bytes).
+    pub feed_id: [u8; 32],
 }
 
 impl Config {
     pub fn validate_caps(max_position: u64, max_agent_capital: u64) -> Result<()> {
         require!(max_position > 0 && max_agent_capital > 0, ErrorCode::InvalidCaps);
         Ok(())
+    }
+
+    pub fn validate_trading(
+        allowed_dex_programs: &[Pubkey],
+        max_price_age_secs: i64,
+        max_swap_deviation_bps: u16,
+        late_penalty_bps: u16,
+        feeds: &[FeedMapping],
+    ) -> Result<()> {
+        require!(allowed_dex_programs.len() <= MAX_DEX_PROGRAMS, ErrorCode::InvalidTradingConfig);
+        require!(feeds.len() <= MAX_FEEDS, ErrorCode::InvalidTradingConfig);
+        require!(max_price_age_secs > 0, ErrorCode::InvalidTradingConfig);
+        require!(max_swap_deviation_bps <= MAX_SWAP_DEVIATION_BPS, ErrorCode::InvalidTradingConfig);
+        require!(late_penalty_bps <= MAX_LATE_PENALTY_BPS, ErrorCode::InvalidTradingConfig);
+        for (i, f) in feeds.iter().enumerate() {
+            require!(
+                !feeds[..i].iter().any(|g| g.mint == f.mint),
+                ErrorCode::InvalidTradingConfig
+            );
+        }
+        Ok(())
+    }
+
+    pub fn feed_for(&self, mint: &Pubkey) -> Result<[u8; 32]> {
+        self.feeds
+            .iter()
+            .find(|f| f.mint == *mint)
+            .map(|f| f.feed_id)
+            .ok_or_else(|| error!(ErrorCode::NoFeedForMint))
+    }
+}
+
+/// Created when a position begins trading under vault custody and closed when
+/// it settles. Its existence is what tells the program a position's principal
+/// is in the vault rather than in the trading wallet.
+#[account(discriminator = CUSTODY_DISCRIMINATOR)]
+#[derive(InitSpace)]
+pub struct Custody {
+    pub position: Pubkey,
+    /// Paid the rent of this account and of the vault's wrapped SOL account;
+    /// gets both back at settlement.
+    pub rent_payer: Pubkey,
+    /// Bit `i` is set while the vault's token account for
+    /// `agent.terms.allowed_assets[i]` holds a non-zero balance. Wrapped SOL
+    /// is the base asset and never in the mask.
+    pub held_mask: u8,
+    pub swaps: u32,
+    pub bump: u8,
+}
+
+impl Custody {
+    /// Position of `mint` in the agent's allowed assets, or None for wrapped
+    /// SOL (always allowed) and for any mint the agent did not publish.
+    pub fn asset_index(terms: &AgentTerms, mint: &Pubkey) -> Option<usize> {
+        terms.allowed_assets.iter().position(|m| m == mint)
+    }
+
+    pub fn set_held(&mut self, index: usize, held: bool) {
+        let bit = 1u8 << index;
+        if held {
+            self.held_mask |= bit;
+        } else {
+            self.held_mask &= !bit;
+        }
     }
 }

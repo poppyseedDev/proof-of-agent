@@ -6,8 +6,12 @@
 //! * The higher the ratio an agent guarantees, the higher the fee it may charge.
 //! * When a trader allocates capital, `principal * ratio` of the agent's collateral is
 //!   locked as a guarantee. An agent cannot accept capital it cannot back.
-//! * If the agent misbehaves (loses beyond its declared drawdown, or never returns the
-//!   funds by the deadline) the locked collateral is paid out to the trader.
+//! * The principal never leaves the position vault: the agent trades it through
+//!   `execute_swap`, which calls an allowlisted DEX with the vault as signer and
+//!   checks every swap against an oracle price. Settlement reads the vault.
+//! * If the agent loses beyond its declared drawdown, the shortfall is paid to the
+//!   trader from the locked collateral. A missed deadline costs a fixed penalty;
+//!   the trader can unwind the vault into SOL and settle it themselves.
 //! * The program's upgrade authority can pause new positions, draws and deposits,
 //!   and cap the size of positions and agents. It cannot move funds or stop
 //!   anyone from getting money back.
@@ -16,6 +20,7 @@ pub mod constants;
 pub mod error;
 pub mod events;
 pub mod instructions;
+pub mod oracle;
 pub mod state;
 
 use anchor_lang::prelude::*;
@@ -73,8 +78,30 @@ pub mod proof_of_agent {
 
     // ---- agent trading key ----
 
+    /// Disabled since vault custody; see `begin_trading`.
     pub fn draw_funds(ctx: Context<DrawFunds>) -> Result<()> {
         instructions::draw_funds::handle_draw_funds(ctx)
+    }
+
+    pub fn begin_trading(ctx: Context<BeginTrading>) -> Result<()> {
+        instructions::begin_trading::handle_begin_trading(ctx)
+    }
+
+    pub fn execute_swap<'info>(
+        ctx: Context<'info, ExecuteSwap<'info>>,
+        amount_in_max: u64,
+        min_out: u64,
+        data: Vec<u8>,
+    ) -> Result<()> {
+        instructions::execute_swap::handle_execute_swap(ctx, amount_in_max, min_out, data)
+    }
+
+    pub fn open_vault_token_account(ctx: Context<OpenVaultTokenAccount>) -> Result<()> {
+        instructions::vault_token_account::handle_open_vault_token_account(ctx)
+    }
+
+    pub fn close_vault_token_account(ctx: Context<CloseVaultTokenAccount>) -> Result<()> {
+        instructions::vault_token_account::handle_close_vault_token_account(ctx)
     }
 
     pub fn settle_position(ctx: Context<SettlePosition>, returned: u64) -> Result<()> {
@@ -112,5 +139,25 @@ pub mod proof_of_agent {
 
     pub fn set_caps(ctx: Context<SetConfig>, max_position: u64, max_agent_capital: u64) -> Result<()> {
         instructions::config::handle_set_caps(ctx, max_position, max_agent_capital)
+    }
+
+    pub fn set_trading_config(
+        ctx: Context<SetConfig>,
+        allowed_dex_programs: Vec<Pubkey>,
+        oracle_program: Pubkey,
+        max_price_age_secs: i64,
+        max_swap_deviation_bps: u16,
+        late_penalty_bps: u16,
+        feeds: Vec<FeedMapping>,
+    ) -> Result<()> {
+        instructions::config::handle_set_trading_config(
+            ctx,
+            allowed_dex_programs,
+            oracle_program,
+            max_price_age_secs,
+            max_swap_deviation_bps,
+            late_penalty_bps,
+            feeds,
+        )
     }
 }

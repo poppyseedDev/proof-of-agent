@@ -130,10 +130,11 @@ fn late_settle_emits_a_missed_deadline_breach_even_without_a_slash() {
 
 #[test]
 fn claim_default_emits_breach_and_closed_with_the_bond_as_payout() {
+    // A position drawn by the previous program's draw_funds: no custody.
     let mut env = Env::launched();
     let op = env.op();
     env.open(0, SOL, 60).unwrap();
-    env.draw(0, &op).unwrap();
+    env.legacy_draw(0, &op.pubkey());
     env.advance_time(60);
     let logs = env.claim_logs(0);
     let (position, _) = env.position_pda(0);
