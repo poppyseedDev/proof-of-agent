@@ -22,6 +22,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import idl from "./idl.json";
+import deployedIdl from "./deployed/devnet.json";
 
 type IdlAccount = { name: string; writable?: boolean; signer?: boolean; address?: string };
 type IdlIx = { name: string; accounts: IdlAccount[] };
@@ -49,6 +50,11 @@ export function idlHash(i: unknown = idl): string {
 }
 
 const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+/** The associated token account of `owner` for `mint` under the classic token program. */
+export const ataOf = (owner: PublicKey, mint: PublicKey) =>
+  PublicKey.findProgramAddressSync([owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()], ATA_PROGRAM)[0];
 const BOND = 20_000_000; // 0.02 SOL
 const PRINCIPAL = 10_000_000; // 0.01 SOL
 /** Enough for the bond, two positions and the rent of the accounts the simulation creates. */
@@ -109,7 +115,22 @@ export function buildLifecycle(i: IdlLike, payer: PublicKey, agentId: BN): { hap
   };
   const step = (name: string, args: Record<string, unknown> = {}, nonce?: BN): Step => {
     const p = nonce ? position(nonce) : undefined;
-    const keys = p ? { ...base, position: p, position_vault: pda(Buffer.from("position_vault"), p.toBuffer()) } : base;
+    const vault = p ? pda(Buffer.from("position_vault"), p.toBuffer()) : undefined;
+    const keys = p && vault
+      ? {
+          ...base,
+          position: p,
+          position_vault: vault,
+          custody: pda(Buffer.from("custody"), p.toBuffer()),
+          wsol_mint: SOL_MINT,
+          mint: SOL_MINT,
+          vault_wsol: ataOf(vault, SOL_MINT),
+          vault_ata: ataOf(vault, SOL_MINT),
+          rent_payer: payer,
+          token_program: TOKEN_PROGRAM,
+          associated_token_program: ATA_PROGRAM,
+        }
+      : base;
     return { name, ix: buildIx(i, coder, name, args, keys) };
   };
   const [n1, n2] = [new BN(1), new BN(2)];
@@ -121,21 +142,30 @@ export function buildLifecycle(i: IdlLike, payer: PublicKey, agentId: BN): { hap
     step("set_executor", { executor: payer }),
     step("publish_agent"),
   ];
+  // Positions trade under vault custody since begin_trading exists; before it, the
+  // program moved the principal to the trading key with draw_funds.
+  const custody = i.instructions.some((x) => x.name === "begin_trading");
+  const start = (nonce: BN) => step(custody ? "begin_trading" : "draw_funds", {}, nonce);
   return {
     happy: [
       ...setup,
       open(n1),
-      step("draw_funds", {}, n1),
+      start(n1),
+      // Under custody `returned` is ignored: the vault's wSOL (the untouched principal) settles.
       step("settle_position", { returned: new BN(PRINCIPAL) }, n1),
       open(n2),
+      ...(custody ? [step("open_vault_token_account", {}, n2), step("close_vault_token_account", {}, n2)] : []),
       step("cancel_position", {}, n2),
       step("set_accepting", { accepting: false }),
       step("set_accepting", { accepting: true }),
       step("withdraw_collateral", { amount: new BN(BOND) }),
     ],
-    claim: [...setup, open(n1), step("draw_funds", {}, n1), step("claim_default", {}, n1)],
+    claim: [...setup, open(n1), start(n1), step("claim_default", {}, n1)],
   };
 }
+
+/** The refusal that proves claim_default is wired: a custody position cannot default; a legacy one is simply too early. */
+export const EXPECTED_CLAIM_REFUSAL = (i: IdlLike) => (i.instructions.some((x) => x.name === "begin_trading") ? "UseSettle" : "DeadlineNotReached");
 
 type SimError = null | string | { InstructionError?: [number, string | { Custom?: number }] };
 
@@ -168,7 +198,13 @@ async function simulate(connection: Connection, payer: PublicKey, steps: Step[])
  * Runs the check. `payer` must hold at least MIN_PAYER_LAMPORTS on the cluster; its key is
  * not needed. Never throws: problems with the RPC come back as `unknown`.
  */
-export async function checkLive(connection: Connection, payer: PublicKey, i: IdlLike = idl as unknown as IdlLike): Promise<LiveCheck> {
+export async function checkLive(
+  connection: Connection,
+  payer: PublicKey,
+  i: IdlLike = idl as unknown as IdlLike,
+  /** The IDL of the program that is deployed, so an instruction it lacks reads as "needs the upgrade" rather than broken. */
+  deployed: IdlLike | null = deployedIdl as unknown as IdlLike,
+): Promise<LiveCheck> {
   const hash = idlHash(i);
   const done = (status: LiveCheck["status"], reason: string, failedAt?: string, checked: string[] = []): LiveCheck => ({
     status,
@@ -194,6 +230,9 @@ export async function checkLive(connection: Connection, payer: PublicKey, i: Idl
 
     const happy = await simulate(connection, payer, steps.happy);
     const h = classify(i, steps.happy, happy.err, happy.logs);
+    if (h.kind === "wiring" && deployed && !deployed.instructions.some((x) => x.name === h.at)) {
+      return done("blocked", `${h.at} is not in the deployed program yet: this build trades once the program is upgraded`, h.at);
+    }
     if (h.kind === "wiring") {
       const hint = /AccountNotInitialized/.test(h.detail) && /config/.test(h.detail) ? " The protocol config does not exist yet: run `npm run config -- init`." : "";
       return done("broken", `${h.at} does not work against the deployed program: ${h.detail}.${hint}`, h.at);
@@ -203,11 +242,12 @@ export async function checkLive(connection: Connection, payer: PublicKey, i: Idl
     const claim = await simulate(connection, payer, steps.claim);
     const c = classify(i, steps.claim, claim.err, claim.logs);
     const names = [...new Set([...steps.happy, ...steps.claim].map((s) => s.name))];
-    // The deadline is ten minutes away, so the only right answer is "too early".
-    if (c.kind === "refused" && c.at === "claim_default" && c.error === "DeadlineNotReached") {
+    // The only right answer: the position is in custody and cannot default (or,
+    // for a program without custody, the deadline ten minutes away is not reached).
+    if (c.kind === "refused" && c.at === "claim_default" && c.error === EXPECTED_CLAIM_REFUSAL(i)) {
       return done("ok", `all ${names.length} instructions work against the deployed program`, undefined, names);
     }
-    if (c.kind === "passed") return done("broken", "claim_default succeeded before the deadline", "claim_default");
+    if (c.kind === "passed") return done("broken", "claim_default succeeded on a position that cannot default", "claim_default");
     if (c.kind === "refused") return done("blocked", `${c.at} was refused by the program: ${c.error} (${c.msg})`, c.at);
     return done("broken", `${c.at} does not work against the deployed program: ${c.detail}`, c.at);
   } catch (e) {

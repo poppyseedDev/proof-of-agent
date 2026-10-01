@@ -33,13 +33,15 @@ function fakeCluster(results: { err: unknown; logs?: string[] }[], opts: { balan
 
 const lifecycle = () => buildLifecycle(IDL, payer, new BN(7));
 const claimIndex = () => lifecycle().claim.findIndex((s) => s.name === "claim_default");
-const tooEarly = () => ({ err: { InstructionError: [claimIndex(), { Custom: errorCode("DeadlineNotReached") }] } });
+const tooEarly = () => ({ err: { InstructionError: [claimIndex(), { Custom: errorCode("UseSettle") }] } });
 
 describe("buildLifecycle", () => {
   it("covers every instruction the site, the runner and the SDK send", () => {
     const { happy, claim } = lifecycle();
     const covered = new Set([...happy, ...claim].map((s) => s.name));
-    const admin = new Set(["init_config", "set_paused", "set_caps"]); // sent by `npm run config` only
+    const admin = new Set(["init_config", "set_paused", "set_caps", "set_trading_config"]); // sent by `npm run config` only
+    admin.add("execute_swap"); // needs a DEX and oracle prices on the cluster; covered by the program's own tests
+    admin.add("draw_funds"); // disabled since vault custody; kept so old clients get a clear error
     const missing = IDL.instructions.map((i) => i.name).filter((n) => !covered.has(n) && !admin.has(n));
     assert.deepEqual(missing, [], "add new instructions to buildLifecycle in lib/liveCheck.ts");
   });
@@ -70,12 +72,26 @@ describe("buildLifecycle", () => {
 
   it("refuses to guess an account it does not know", () => {
     const next: IdlLike = JSON.parse(JSON.stringify(IDL));
-    next.instructions.find((i) => i.name === "draw_funds")!.accounts.push({ name: "oracle" });
-    assert.throws(() => buildLifecycle(next, payer, new BN(1)), /draw_funds needs account "oracle"/);
+    next.instructions.find((i) => i.name === "begin_trading")!.accounts.push({ name: "oracle" });
+    assert.throws(() => buildLifecycle(next, payer, new BN(1)), /begin_trading needs account "oracle"/);
   });
 
   it("also builds from the IDL of the deployed program", () => {
-    assert.equal(buildLifecycle(deployed as unknown as IdlLike, payer, new BN(1)).happy.length, lifecycle().happy.length);
+    // The deployed program predates custody: it draws instead of beginning trading.
+    const old = buildLifecycle(deployed as unknown as IdlLike, payer, new BN(1));
+    assert.ok(old.happy.some((s) => s.name === "draw_funds"));
+    assert.ok(!old.happy.some((s) => s.name === "begin_trading"));
+    assert.ok(lifecycle().happy.some((s) => s.name === "begin_trading"));
+  });
+
+  it("reads a new instruction the deployed program lacks as blocked, not broken", async () => {
+    const at = lifecycle().happy.findIndex((s) => s.name === "begin_trading");
+    const r = await checkLive(fakeCluster([{ err: { InstructionError: [at, "InvalidInstructionData"] }, logs: [] }]).connection, payer);
+    assert.deepEqual([r.status, r.failedAt], ["blocked", "begin_trading"]);
+    assert.match(r.reason, /not in the deployed program yet/);
+    // Against a program that has it, the same failure is a real break.
+    const same = await checkLive(fakeCluster([{ err: { InstructionError: [at, "InvalidInstructionData"] }, logs: [] }]).connection, payer, IDL, IDL);
+    assert.equal(same.status, "broken");
   });
 });
 

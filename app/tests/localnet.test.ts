@@ -15,7 +15,9 @@ import {
   Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import idl from "../lib/idl.json";
-import { agentPda, agentVaultPda, positionPda, positionVaultPda } from "../lib/program";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT, agentPda, agentVaultPda, ataOf, configPda, custodyPda, positionPda, positionVaultPda,
+} from "../lib/program";
 import { U64_MAX, ensureConfig, loadAdmin, setCaps, setPaused } from "../scripts/protocolConfig";
 
 const RPC = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8899";
@@ -117,19 +119,41 @@ async function setup(ratioBps = 3000, drawdownBps = 2000, bondSol = 1, publish =
         .rpc();
       return position;
     },
+    /** Starts trading under vault custody (what draw_funds used to do). */
     draw: (position: PublicKey, program: Prog = ap, executor: PublicKey = agentKp.publicKey) =>
       program.methods
-        .drawFunds()
-        .accounts({ executor, agent, position, positionVault: positionVaultPda(position), systemProgram: SystemProgram.programId })
-        .rpc(),
-    settle: (position: PublicKey, returned: number, program: Prog = ap, executor: PublicKey = agentKp.publicKey) =>
-      program.methods
-        .settlePosition(new BN(returned))
+        .beginTrading()
         .accounts({
-          executor, operator: agentKp.publicKey, agent, agentVault, position,
-          positionVault: positionVaultPda(position), trader: traderKp.publicKey, systemProgram: SystemProgram.programId,
+          executor, agent, position, positionVault: positionVaultPda(position), custody: custodyPda(position),
+          wsolMint: WSOL_MINT, vaultWsol: ataOf(positionVaultPda(position), WSOL_MINT), tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, config: configPda(),
         })
         .rpc(),
+    /** The vault's wSOL balance, which is what a custody settle pays out. */
+    vaultWsol: async (position: PublicKey) => {
+      const info = await connection.getTokenAccountBalance(ataOf(positionVaultPda(position), WSOL_MINT), "confirmed").catch(() => null);
+      return info ? Number(info.value.amount) : 0;
+    },
+    /**
+     * Settles. A trading position is in custody and settles on its vault: `returned`
+     * is only used to decide whether to pass the custody accounts (a declined open
+     * position needs none). Nothing here can make the vault hold more or less than
+     * the principal, so every custody settle returns exactly the principal.
+     */
+    settle: async (position: PublicKey, returned: number, program: Prog = ap, executor: PublicKey = agentKp.publicKey) => {
+      const custody = custodyPda(position);
+      const c = await ap.account.custody.fetchNullable(custody);
+      const vault = positionVaultPda(position);
+      return program.methods
+        .settlePosition(new BN(c ? 0 : returned))
+        .accounts({
+          executor, operator: agentKp.publicKey, agent, agentVault, position,
+          positionVault: vault, trader: traderKp.publicKey, systemProgram: SystemProgram.programId,
+          custody, vaultWsol: c ? ataOf(vault, WSOL_MINT) : null, rentPayer: c ? c.rentPayer : null,
+          tokenProgram: c ? TOKEN_PROGRAM_ID : null, config: c ? configPda() : null,
+        })
+        .rpc();
+    },
     publish: () => ap.methods.publishAgent().accounts({ operator: agentKp.publicKey, agent }).rpc(),
     bindExecutor: (executor: PublicKey) =>
       ap.methods.setExecutor(executor).accounts({ operator: agentKp.publicKey, agent }).rpc(),
@@ -143,7 +167,7 @@ async function setup(ratioBps = 3000, drawdownBps = 2000, bondSol = 1, publish =
         .claimDefault()
         .accounts({
           trader: traderKp.publicKey, agent, agentVault, position,
-          positionVault: positionVaultPda(position), systemProgram: SystemProgram.programId,
+          positionVault: positionVaultPda(position), systemProgram: SystemProgram.programId, custody: custodyPda(position),
         })
         .rpc(),
     withdraw: (lamports: number) =>
@@ -225,23 +249,32 @@ describe("proof_of_agent on localnet", () => {
     const position = await env.open(1 * SOL, 3600);
     await env.draw(position);
     assert.deepEqual((await env.positionState(position)).status, { trading: {} });
-    assert.equal(await balance(positionVaultPda(position)), rentFloor);
+    // The principal is wrapped in the vault's wSOL account; the vault itself holds nothing.
+    assert.equal(await balance(positionVaultPda(position)), 0);
+    assert.equal(await env.vaultWsol(position), 1 * SOL);
 
+    // Without a DEX on localnet the vault cannot gain or lose, so the settle
+    // returns exactly the principal: no fee, no slash, no breach.
     const traderBefore = await balance(env.traderKp.publicKey);
-    await env.settle(position, 1.2 * SOL); // +20%: fee = 15% of 0.2 = 0.03
+    const opBefore = await balance(env.agentKp.publicKey);
+    await env.settle(position, 0);
 
     const p = await env.positionState(position);
     assert.deepEqual(p.status, { settled: {} });
-    assert.equal(p.feePaid.toNumber(), 0.03 * SOL);
+    assert.equal(p.returned.toNumber(), 1 * SOL);
+    assert.equal(p.feePaid.toNumber(), 0);
     assert.equal(p.slashed.toNumber(), 0);
-    assert.equal((await balance(env.traderKp.publicKey)) - traderBefore, 1.17 * SOL + rentFloor);
+    assert.equal((await balance(env.traderKp.publicKey)) - traderBefore, 1 * SOL + rentFloor);
     assert.equal(await balance(positionVaultPda(position)), 0); // vault fully drained
+    assert.equal(await env.vaultWsol(position), 0);
+    // The operator paid the custody and wSOL account rent at the start and has it back now (less two fees).
+    assert.ok((await balance(env.agentKp.publicKey)) >= opBefore - 2 * 5000, "rent refunded");
 
     const a = await env.agentState();
     assert.equal(a.lockedCollateral.toNumber(), 0);
     assert.equal(a.totalCollateral.toNumber(), 1 * SOL);
     assert.equal(a.settledPositions, 1);
-    assert.equal(a.feesEarned.toNumber(), 0.03 * SOL);
+    assert.equal(a.feesEarned.toNumber(), 0);
   });
 
   it("does not slash a loss inside the declared drawdown", async () => {
@@ -332,22 +365,26 @@ describe("proof_of_agent on localnet", () => {
     await env.open(0.1 * SOL, 3600);
   });
 
-  it("pays the whole guarantee to the trader when the agent misses the deadline (waits ~65s)", { timeout: 120_000 }, async () => {
+  it("lets the trader settle from the vault when the agent misses the deadline (waits ~65s)", { timeout: 120_000 }, async () => {
     const env = await setup(3000, 2000, 1);
     const position = await env.open(1 * SOL, 60); // minimum duration
     await env.draw(position);
-    await expectAnchorError(env.claimDefault(position), "DeadlineNotReached");
+    // A custody position cannot default: the principal is in the vault.
+    await expectAnchorError(env.claimDefault(position), "UseSettle");
+    await expectAnchorError(env.settle(position, 0, env.tp, env.traderKp.publicKey), "UnauthorizedExecutor");
 
     const deadline = (await env.positionState(position)).deadline.toNumber();
     const wait = deadline * 1000 - Date.now() + 5_000;
     await sleep(Math.max(wait, 0));
 
     const before = await balance(env.traderKp.publicKey);
-    await env.claimDefault(position);
-    assert.equal((await balance(env.traderKp.publicKey)) - before + 5000, 0.3 * SOL + rentFloor);
+    await env.settle(position, 0, env.tp, env.traderKp.publicKey);
+    // The principal comes back from the vault; the late penalty is 0 on localnet (no trading config).
+    assert.equal((await balance(env.traderKp.publicKey)) - before + 5000, 1 * SOL + rentFloor);
 
     const p = await env.positionState(position);
-    assert.deepEqual(p.status, { defaulted: {} });
+    assert.deepEqual(p.status, { settled: {} });
+    assert.deepEqual(p.breach, { missedDeadline: {} });
     assert.deepEqual(p.breach, { missedDeadline: {} });
     assert.equal(p.slashed.toNumber(), 0.3 * SOL);
     const a = await env.agentState();
@@ -409,7 +446,7 @@ describe("proof_of_agent on localnet", () => {
     assert.equal(await balance(env.traderKp.publicKey), 0.8 * SOL - 1 + 1 + rentFloor);
   });
 
-  it("pays a default to an empty trader wallet (waits ~65s)", { timeout: 120_000 }, async () => {
+  it("pays a late settle to an empty trader wallet (waits ~65s)", { timeout: 120_000 }, async () => {
     const env = await setup(3000, 2000, 1);
     const position = await env.open(1 * SOL, 60);
     await env.draw(position);
@@ -419,15 +456,19 @@ describe("proof_of_agent on localnet", () => {
 
     const deadline = (await env.positionState(position)).deadline.toNumber();
     await sleep(Math.max(deadline * 1000 - Date.now() + 5_000, 0));
+    const custody = await env.ap.account.custody.fetch(custodyPda(position));
+    const vault = positionVaultPda(position);
     const tx = await env.tp.methods
-      .claimDefault()
+      .settlePosition(new BN(0))
       .accounts({
-        trader: env.traderKp.publicKey, agent: env.agent, agentVault: env.agentVault, position,
-        positionVault: positionVaultPda(position), systemProgram: SystemProgram.programId,
+        executor: env.traderKp.publicKey, operator: env.agentKp.publicKey, agent: env.agent, agentVault: env.agentVault, position,
+        positionVault: vault, trader: env.traderKp.publicKey, systemProgram: SystemProgram.programId,
+        custody: custodyPda(position), vaultWsol: ataOf(vault, WSOL_MINT), rentPayer: custody.rentPayer,
+        tokenProgram: TOKEN_PROGRAM_ID, config: configPda(),
       })
       .transaction();
     tx.feePayer = payer.publicKey;
     await sendAndConfirmTransaction(connection, tx, [payer, env.traderKp], { commitment: "confirmed" });
-    assert.equal(await balance(env.traderKp.publicKey), 0.3 * SOL + rentFloor);
+    assert.equal(await balance(env.traderKp.publicKey), 1 * SOL + rentFloor);
   });
 });

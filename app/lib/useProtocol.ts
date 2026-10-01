@@ -8,10 +8,17 @@ import { fetchProgramAccounts, noteConfirmedSlot } from "./accounts";
 import { u64 } from "./amounts";
 import {
   AgentAccount,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  CustodyAccount,
   PositionAccount,
   ProtocolConfig,
+  TOKEN_PROGRAM_ID,
+  WSOL_MINT,
   agentPda,
   agentVaultPda,
+  ataOf,
+  configPda,
+  custodyPda,
   isPublished,
   positionPda,
   positionVaultPda,
@@ -177,6 +184,7 @@ export function useActions() {
           })
           .rpc();
       }),
+    /** Only for positions drawn before vault custody. A custody position is settled instead (see settlePosition). */
     claimDefault: (p: PositionAccount) =>
       run("Claim collateral", async () => {
         const { program, me } = need();
@@ -189,6 +197,37 @@ export function useActions() {
             position: p.publicKey,
             positionVault: positionVaultPda(p.publicKey),
             systemProgram: SystemProgram.programId,
+            custody: custodyPda(p.publicKey),
+          })
+          .rpc();
+      }),
+    /**
+     * The trader's way out of a custody position past its deadline: settle it from
+     * the vault. Requires the vault to hold only wrapped SOL; anything else must be
+     * swapped back first (the agent's job, or the trader's through execute_swap).
+     */
+    settleLate: (agent: AgentAccount, p: PositionAccount) =>
+      run("Settle from the vault", async () => {
+        const { program, me } = need();
+        const vault = positionVaultPda(p.publicKey);
+        const custody = custodyPda(p.publicKey);
+        const c = (await program.account.custody.fetch(custody)) as CustodyAccount;
+        return program.methods
+          .settlePosition(u64(0))
+          .accounts({
+            executor: me,
+            operator: agent.operator,
+            agent: p.agent,
+            agentVault: agentVaultPda(p.agent),
+            position: p.publicKey,
+            positionVault: vault,
+            trader: p.trader,
+            systemProgram: SystemProgram.programId,
+            custody,
+            vaultWsol: ataOf(vault, WSOL_MINT),
+            rentPayer: c.rentPayer,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            config: configPda(),
           })
           .rpc();
       }),
@@ -254,37 +293,64 @@ export function useActions() {
       }),
 
     // ---- trading key (operator or bound executor) ----
-    drawFunds: (p: PositionAccount) =>
-      run("Draw funds", async () => {
+    /** Starts trading under vault custody: the principal is wrapped in the vault, never sent to a wallet. */
+    beginTrading: (p: PositionAccount) =>
+      run("Start trading", async () => {
         const { program, me } = need();
+        const vault = positionVaultPda(p.publicKey);
         return program.methods
-          .drawFunds()
+          .beginTrading()
           .accounts({
             executor: me,
             agent: p.agent,
             position: p.publicKey,
-            positionVault: positionVaultPda(p.publicKey),
+            positionVault: vault,
+            custody: custodyPda(p.publicKey),
+            wsolMint: WSOL_MINT,
+            vaultWsol: ataOf(vault, WSOL_MINT),
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
+            config: configPda(),
           })
           .rpc();
       }),
+    /**
+     * Settles a position. In custody (the usual case) the vault's balance is what
+     * counts and `returnedLamports` is ignored; the trader may settle after the
+     * deadline. For a position drawn before custody, the signer sends `returnedLamports`.
+     * A still-open position is declined and refunded.
+     */
     settlePosition: (agent: AgentAccount, p: PositionAccount, returnedLamports: number) =>
       run("Settle position", async () => {
         const { program, me } = need();
+        const vault = positionVaultPda(p.publicKey);
+        const custody = custodyPda(p.publicKey);
+        const c = (await program.account.custody.fetchNullable(custody)) as CustodyAccount | null;
         return program.methods
-          .settlePosition(u64(returnedLamports))
+          .settlePosition(u64(c ? 0 : returnedLamports))
           .accounts({
             executor: me,
             operator: agent.operator,
             agent: p.agent,
             agentVault: agentVaultPda(p.agent),
             position: p.publicKey,
-            positionVault: positionVaultPda(p.publicKey),
+            positionVault: vault,
             trader: p.trader,
             systemProgram: SystemProgram.programId,
+            custody,
+            vaultWsol: c ? ataOf(vault, WSOL_MINT) : null,
+            rentPayer: c ? c.rentPayer : null,
+            tokenProgram: c ? TOKEN_PROGRAM_ID : null,
+            config: c ? configPda() : null,
           })
           .rpc();
       }),
+    /** Whether a trading position holds its principal in the vault (custody) rather than in the trading wallet. */
+    custodyOf: async (p: PositionAccount): Promise<CustodyAccount | null> => {
+      const { program } = need();
+      return (await program.account.custody.fetchNullable(custodyPda(p.publicKey))) as CustodyAccount | null;
+    },
   };
 }
 

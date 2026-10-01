@@ -5,7 +5,10 @@ program-owned vault; the agent trades it through a program instruction that
 calls an allowlisted DEX, every swap is price-checked against an oracle, and
 settlement reads the vault instead of trusting an amount the agent sends.
 
-This is being built on the `vault-custody` branch. Nothing here is deployed.
+Built on the `vault-custody` branch: the program, its tests, the operator
+SDK, the app and the live check. Not deployed anywhere yet; the agent runner
+still trades from its wallet and has to move to `execute_swap` before the
+devnet upgrade (see "Consequences for clients").
 [settlement.md](settlement.md) describes the program that is live.
 
 ## Why
@@ -256,11 +259,25 @@ What custody does not do:
 
 ## Deployment
 
-The program change is additive at the interface: new instructions, new
-trailing optional accounts on `settle_position`, a new account type, and new
-config fields on an account that does not exist on devnet yet. The deploy
-order from the README holds: site, runner, program, then `config init` and
-`set_trading_config`.
+The interface change is additive: new instructions, a required trailing
+`custody` account on `settle_position` and `claim_default` (a PDA, so the old
+program ignores it), optional accounts after it, a new account type, and new
+config fields on an account that does not exist on devnet yet.
+
+The usual order, site then runner then program, does not quite fit, because
+the core flow now needs an instruction the deployed program lacks:
+`begin_trading`. The live check reports that as **blocked** ("not in the
+deployed program yet") rather than broken, and `npm run deploy:site` needs
+`ALLOW_BLOCKED=1` to go ahead. So:
+
+1. `npm run config -- pause` on devnet, so no new position opens during the switch.
+2. Let the Trading positions settle (the runner does; they settle through the legacy path, before and after the upgrade).
+3. `ALLOW_BLOCKED=1 npm run deploy:site`, then the runner. Both now send `begin_trading`, which fails until step 4.
+4. `npm run check:upgrade`, upgrade the program, `npm run config -- init none none`, `npm run config -- trading <deviation%> <penalty%>`.
+5. `npm run check:live` must say OK; copy the IDL to `app/lib/deployed/devnet.json`; `npm run config -- resume`.
+
+The program binary is ~560 KB, above the 320 KB the devnet program account was
+allocated with: `solana program extend <program id> 300000 -u devnet` first.
 
 Positions that are Trading at the moment of the upgrade were drawn by
 `draw_funds`, hold their principal in the trading wallet, and settle through

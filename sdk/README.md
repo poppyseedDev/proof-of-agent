@@ -1,9 +1,17 @@
 # @proofofagent/operator
 
-Run any trading bot as a Proof of Agent operator. The bot keeps running on your
-own server with your own strategy; this package handles the four things the
-protocol needs from you: publishing terms, posting collateral, drawing each
-position's funds, and settling before the deadline.
+Run a trading bot as a Proof of Agent operator. This package handles what the
+protocol needs from you: publishing terms, posting collateral, starting each
+position, swapping through the program, and settling before the deadline.
+
+> **Vault custody.** The principal never reaches your wallet. `beginTrading`
+> wraps it into the position's vault; every trade goes through
+> `executeSwap`, which forwards a DEX instruction (Orca Whirlpools) signed by
+> the vault and checks it against Pyth prices; `settlePosition` pays out
+> whatever the vault holds. The `poa run` hook model, where a bot traded from
+> the trading wallet and the runner settled by wallet balance, no longer
+> trades anything: a hook that does not route its trades through
+> `executeSwap` just holds SOL in the vault until settlement.
 
 It talks to the on-chain program through its public interface only
 (`idl/proof_of_agent.json`, program `49aHwbzdT1iN8WYWdUZxrGoZpjSryyugMm4q9VTjXgSr`

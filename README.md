@@ -6,6 +6,9 @@ Public one-pager and waitlist at [proofofagent.dev](https://proofofagent.dev); t
 **The rule:** an agent must post its own SOL as collateral before it can manage
 anyone's capital. The more it guarantees per unit managed, the higher the fee it
 may charge. If it misbehaves, the collateral is paid to the trader by the program.
+The capital itself never leaves the program: the agent trades it from the
+position's vault through `execute_swap`, which only calls allowlisted DEX
+programs and checks every swap against an oracle price.
 
 ## How it works
 
@@ -16,9 +19,10 @@ may charge. If it misbehaves, the collateral is paid to the trader by the progra
 | Bind key | Operator | Optionally binds a trading key that may draw and settle, and nothing else. |
 | Publish | Operator | Requires collateral. Terms become permanent and traders can allocate. |
 | Open position | Trader | Deposits `P` SOL with a deadline inside the agent's window. `P × ratio` of the agent's free collateral is locked to this position. Fails if the agent cannot back it. |
-| Draw | Trading key | Pulls the principal to trade with. The clock is now running. |
-| Settle | Trading key | Returns `R` SOL. Profit: the operator earns `fee` of the profit. Loss within drawdown: trader takes it. Loss beyond drawdown: a breach; the shortfall is paid from locked collateral to the trader. Settling at or after the deadline is still allowed until the trader claims the default, but it is recorded as a missed-deadline breach. Settling a position that was never drawn declines it: the trader is refunded and it does not count as a settled position. |
-| Claim default | Trader | If the agent never settled by the deadline, the trader takes the entire locked guarantee and a breach is recorded. |
+| Start trading | Trading key | `begin_trading` wraps the principal into a wSOL account the position vault owns. The clock is now running. |
+| Swap | Trading key | `execute_swap` forwards a DEX instruction (Orca on devnet and mainnet; Jupiter later) signed by the vault, between two of the vault's token accounts. Only the agent's allowed assets, only allowlisted DEX programs, and the output must be worth at least `(1 − max deviation)` of the input at Pyth prices. After the deadline, the trader may swap too, but only back into SOL. |
+| Settle | Trading key, or the trader after the deadline | Everything in the vault must be back in wSOL. The vault's balance `R` settles the position: profit pays the operator `fee` of the profit; a loss within the drawdown is the trader's; a loss beyond it is a breach paid from the locked collateral. At or after the deadline, a late penalty (a share of the locked bond) is added and the breach is recorded as a missed deadline. Settling a position that was never started declines it: the trader is refunded and it does not count as a settled position. |
+| Claim default | Trader | Only for positions drawn by the program version before custody, whose principal left the vault: the trader takes the entire locked guarantee. A custody position cannot default; its trader settles it from the vault instead. |
 | Cancel | Trader | While the position is still open (not drawn), the trader can pull out with no fee. Cancel and draw race: whichever transaction lands first wins. |
 
 Example: you allocate 1,000 to a 30% agent. The protocol reserves 300 of the
@@ -86,7 +90,13 @@ pick **Localnet**, otherwise Phantom simulates against devnet and reports
 After changing the program: `anchor build && anchor deploy --provider.cluster localnet`
 and copy the IDL: `cp target/idl/proof_of_agent.json app/lib/idl.json` and to
 `sdk/idl/`. Then run `npm test` in `app/`: it fails if the new IDL would not work
-against the program on devnet.
+against the program on devnet. `anchor build` also builds `programs/mock_dex`, a
+stand-in DEX the program's tests swap through; it is never deployed.
+
+Custody positions can only swap once the admin has set the trading config:
+`npm run config -- trading 2 10` allows Orca Whirlpools, prices swaps with Pyth
+(SOL and USDC, including devnet USDC), lets a swap lose at most 2% of oracle
+value and charges 10% of the locked bond on a late settlement.
 
 ## Devnet
 
@@ -231,13 +241,17 @@ defaults, agents can still settle and decline, and operators can still
 withdraw free collateral. Draws stop because an undrawn position cannot
 default: the trader can cancel it. New caps apply to new positions only.
 
-## Trust model (v1)
+## Trust model
 
-In v1 the agent *borrows* the principal to trade off-chain, bonded by its
-collateral. That means the trader's exposure is `principal − guarantee` if the
-agent absconds, and the same bound holds if it settles with nothing returned:
-terms must keep ratio + max drawdown ≤ 100%, so a slash on settlement can
-always reach the whole bond. A ratio of 100% (which forces a max drawdown of
-0) makes the position fully backed. v2 should keep
-funds in the vault and restrict the agent to whitelisted DEX CPIs so the
-guarantee only needs to cover drawdown, not the whole principal.
+The agent never holds the principal. It trades it from the position's vault
+through `execute_swap`, which only calls allowlisted DEX programs, only into
+the agent's published assets, and refuses any swap that returns less than
+`(1 − max deviation)` of its oracle value. The trader's exposure is the
+agreed drawdown plus what the deviation lets a swap lose; the bond covers the
+part beyond the drawdown. Theft is not a path: without the oracle check an
+operator could swap the vault into a pool they own at any price, which is why
+the check is not optional. See [docs/custody.md](docs/custody.md).
+
+Positions drawn by the program version before custody (`draw_funds` moved the
+principal to the trading key) keep the old rule: the trader's exposure is
+`principal − guarantee`, and a missed deadline forfeits the whole bond.

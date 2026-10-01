@@ -54,6 +54,34 @@ export function positionVaultPda(position: PublicKey) {
     PROGRAM_ID,
   )[0];
 }
+/** Exists while a position trades under vault custody. */
+export function custodyPda(position: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [enc("custody"), position.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+export function configPda() {
+  return PublicKey.findProgramAddressSync([enc("config")], PROGRAM_ID)[0];
+}
+
+export const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+export const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+/** The associated token account of `owner` for `mint` under the classic token program. */
+export function ataOf(owner: PublicKey, mint: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  )[0];
+}
+
+export type CustodyAccount = {
+  position: PublicKey;
+  rentPayer: PublicKey;
+  heldMask: number;
+  swaps: number;
+};
 
 /** Read-only program (no wallet) for listing accounts. */
 export function readonlyProgram(connection: Connection) {

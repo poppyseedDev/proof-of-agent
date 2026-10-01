@@ -36,6 +36,16 @@ export const agentVaultPda = (agent: PublicKey) => PublicKey.findProgramAddressS
 /** Protocol config: the pause switch and the position and agent caps. */
 export const configPda = () => PublicKey.findProgramAddressSync([seed("config")], PROGRAM_ID)[0];
 export const positionVaultPda = (position: PublicKey) => PublicKey.findProgramAddressSync([seed("position_vault"), position.toBuffer()], PROGRAM_ID)[0];
+/** Exists while a position trades under vault custody; closed when it settles. */
+export const custodyPda = (position: PublicKey) => PublicKey.findProgramAddressSync([seed("custody"), position.toBuffer()], PROGRAM_ID)[0];
+
+export const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+export const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+export const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+/** The associated token account of `owner` for `mint`. */
+export const ataOf = (owner: PublicKey, mint: PublicKey, tokenProgram: PublicKey = TOKEN_PROGRAM_ID) =>
+  PublicKey.findProgramAddressSync([owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()], ASSOCIATED_TOKEN_PROGRAM_ID)[0];
 export const positionPda = (agent: PublicKey, trader: PublicKey, nonce: BN) =>
   PublicKey.findProgramAddressSync([seed("position"), agent.toBuffer(), trader.toBuffer(), nonce.toArrayLike(Buffer, "le", 8)], PROGRAM_ID)[0];
 
@@ -70,6 +80,33 @@ export type Agent = {
   slashedTotal: BN;
   feesEarned: BN;
   publishedAt: BN;
+};
+
+export type Custody = {
+  position: PublicKey;
+  /** Paid the custody and wSOL account rent; gets it back at settlement. */
+  rentPayer: PublicKey;
+  /** Bit i set while the vault holds some of the agent's allowed asset i. */
+  heldMask: number;
+  swaps: number;
+};
+
+/** What `executeSwap` needs: the DEX instruction as the DEX's client built it, plus the two legs and their price updates. */
+export type SwapRequest = {
+  position: PublicKey;
+  mintIn: PublicKey;
+  mintOut: PublicKey;
+  /** Token program of each mint (classic unless the mint is Token-2022). */
+  tokenProgramIn?: PublicKey;
+  tokenProgramOut?: PublicKey;
+  /** Pyth price update accounts for the two mints. */
+  priceIn: PublicKey;
+  priceOut: PublicKey;
+  /** The DEX program and its instruction, with the vault PDA as the token authority and the vault's ATAs as its token accounts. */
+  dex: TransactionInstruction;
+  /** The program refuses the swap if the DEX takes more than this, or returns less than minOut. */
+  amountInMax: Amount;
+  minOut: Amount;
 };
 
 export type Position = {
@@ -241,28 +278,102 @@ export class PoaClient {
   }
 
   // ---- trading key ----
+  /** The custody account of a position, or null for a position that is not trading under custody. */
+  async custody(position: PublicKey): Promise<Custody | null> {
+    return (await this.program.account.custody.fetchNullable(custodyPda(position))) as Custody | null;
+  }
+  /**
+   * Starts trading a position under vault custody: the principal is wrapped into
+   * the vault's wSOL account and can only move through executeSwap. The signer
+   * pays the rent of the custody and wSOL accounts and gets it back at settlement.
+   */
+  beginTrading(agent: PublicKey, position: PublicKey) {
+    const vault = positionVaultPda(position);
+    return this.program.methods.beginTrading()
+      .accounts({
+        executor: this.signer.publicKey, agent, position, positionVault: vault, custody: custodyPda(position),
+        wsolMint: WSOL_MINT, vaultWsol: ataOf(vault, WSOL_MINT), tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SYSTEM, config: configPda(),
+      }).rpc() as Promise<string>;
+  }
+  /** Disabled by the program since vault custody; use beginTrading. Kept so old scripts fail with the program's own error. */
   drawFunds(agent: PublicKey, position: PublicKey) {
     return this.program.methods.drawFunds()
       .accounts({ executor: this.signer.publicKey, agent, position, positionVault: positionVaultPda(position), systemProgram: SYSTEM }).rpc() as Promise<string>;
   }
-  private settleMethod(a: Agent, p: Position, returnedLamports: Amount) {
-    return this.program.methods.settlePosition(toBN(returnedLamports, "returnedLamports"))
+  /** Creates the vault's token account for one of the agent's allowed assets, so a swap can receive it. The signer pays its rent. */
+  openVaultTokenAccount(agent: PublicKey, position: PublicKey, mint: PublicKey, tokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
+    const vault = positionVaultPda(position);
+    return this.program.methods.openVaultTokenAccount()
+      .accounts({
+        executor: this.signer.publicKey, agent, position, positionVault: vault, mint, vaultAta: ataOf(vault, mint, tokenProgram),
+        tokenProgram, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SYSTEM,
+      }).rpc() as Promise<string>;
+  }
+  /** Closes an empty vault token account; the rent goes to the signer. Not the wSOL account while the position trades. */
+  closeVaultTokenAccount(agent: PublicKey, position: PublicKey, mint: PublicKey, tokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
+    const vault = positionVaultPda(position);
+    return this.program.methods.closeVaultTokenAccount()
+      .accounts({ executor: this.signer.publicKey, agent, position, positionVault: vault, mint, vaultAta: ataOf(vault, mint, tokenProgram), tokenProgram })
+      .rpc() as Promise<string>;
+  }
+  /**
+   * The execute_swap instruction: the DEX instruction is forwarded by the program,
+   * signed by the vault. The DEX's accounts go in as remaining accounts with the
+   * vault not marked as a signer (the program marks it inside the CPI).
+   */
+  async executeSwapInstruction(agent: PublicKey, r: SwapRequest): Promise<TransactionInstruction> {
+    const vault = positionVaultPda(r.position);
+    const tokenProgramIn = r.tokenProgramIn ?? TOKEN_PROGRAM_ID;
+    const tokenProgramOut = r.tokenProgramOut ?? TOKEN_PROGRAM_ID;
+    const remaining = r.dex.keys.map((k) => ({ ...k, isSigner: k.pubkey.equals(vault) ? false : k.isSigner }));
+    return this.program.methods.executeSwap(toBN(r.amountInMax, "amountInMax"), toBN(r.minOut, "minOut"), Buffer.from(r.dex.data))
+      .accounts({
+        executor: this.signer.publicKey, agent, position: r.position, custody: custodyPda(r.position), positionVault: vault,
+        mintIn: r.mintIn, mintOut: r.mintOut, vaultIn: ataOf(vault, r.mintIn, tokenProgramIn), vaultOut: ataOf(vault, r.mintOut, tokenProgramOut),
+        priceIn: r.priceIn, priceOut: r.priceOut, dexProgram: r.dex.programId, tokenProgramIn, tokenProgramOut, config: configPda(),
+      })
+      .remainingAccounts(remaining)
+      .instruction();
+  }
+  /** Sends one execute_swap, with `before` (price updates, compute budget) in front of it. */
+  async executeSwap(agent: PublicKey, r: SwapRequest, before: TransactionInstruction[] = []): Promise<string> {
+    const ix = await this.executeSwapInstruction(agent, r);
+    const tx = new Transaction().add(...before, ix);
+    return this.program.provider.sendAndConfirm(tx, [this.signer]) as Promise<string>;
+  }
+  /**
+   * Settle accounts for a position: with the custody set when the position trades
+   * under custody (the vault's balance settles; `returned` is ignored), the legacy
+   * set otherwise (the signer sends `returned`).
+   */
+  private async settleMethod(a: Agent, p: Position, returnedLamports: Amount, custodyState?: Custody | null) {
+    const custody = custodyPda(p.publicKey);
+    const c = custodyState !== undefined ? custodyState : p.status === "trading" ? await this.custody(p.publicKey) : null;
+    const vault = positionVaultPda(p.publicKey);
+    return this.program.methods.settlePosition(toBN(c ? 0 : returnedLamports, "returnedLamports"))
       .accounts({
         executor: this.signer.publicKey, operator: a.operator, agent: a.publicKey, agentVault: agentVaultPda(a.publicKey),
-        position: p.publicKey, positionVault: positionVaultPda(p.publicKey), trader: p.trader, systemProgram: SYSTEM,
+        position: p.publicKey, positionVault: vault, trader: p.trader, systemProgram: SYSTEM,
+        custody, vaultWsol: c ? ataOf(vault, WSOL_MINT) : null, rentPayer: c ? c.rentPayer : null,
+        tokenProgram: c ? TOKEN_PROGRAM_ID : null, config: c ? configPda() : null,
       });
   }
-  /** Settles with one plain send, no priority fee. The runner uses settle() instead. */
-  settlePosition(a: Agent, p: Position, returnedLamports: Amount) {
-    return this.settleMethod(a, p, returnedLamports).rpc() as Promise<string>;
+  /**
+   * Settles with one plain send, no priority fee. The runner uses settle() instead.
+   * `custody` skips the lookup: pass the position's custody account, or null for
+   * a position drawn before vault custody.
+   */
+  async settlePosition(a: Agent, p: Position, returnedLamports: Amount, custody?: Custody | null) {
+    return (await this.settleMethod(a, p, returnedLamports, custody)).rpc() as Promise<string>;
   }
   /**
    * Settles with a compute-budget priority fee, resending until confirmed (see
    * sendUntilConfirmed). `microLamports` is read at each fresh signing, so a
    * caller can raise it as the deadline nears.
    */
-  async settle(a: Agent, p: Position, returnedLamports: Amount, fee: { microLamports: number | (() => number) }, opts: SendOptions = {}): Promise<Sent> {
-    const ix: TransactionInstruction = await this.settleMethod(a, p, returnedLamports).instruction();
+  async settle(a: Agent, p: Position, returnedLamports: Amount, fee: { microLamports: number | (() => number) }, opts: SendOptions = {}, custody?: Custody | null): Promise<Sent> {
+    const ix: TransactionInstruction = await (await this.settleMethod(a, p, returnedLamports, custody)).instruction();
     return sendUntilConfirmed(this.connection, (blockhash) => {
       const microLamports = typeof fee.microLamports === "function" ? fee.microLamports() : fee.microLamports;
       const tx = new Transaction({ feePayer: this.signer.publicKey, recentBlockhash: blockhash }).add(
@@ -290,9 +401,10 @@ export class PoaClient {
       .accounts({ trader: this.signer.publicKey, agent, position, positionVault: positionVaultPda(position), systemProgram: SYSTEM })
       .rpc() as Promise<string>;
   }
+  /** Only for a position drawn before vault custody. A custody position past its deadline is settled by the trader instead (settlePosition). */
   claimDefault(a: Agent, p: Position) {
     return this.program.methods.claimDefault()
-      .accounts({ trader: this.signer.publicKey, agent: a.publicKey, agentVault: agentVaultPda(a.publicKey), position: p.publicKey, positionVault: positionVaultPda(p.publicKey), systemProgram: SYSTEM })
+      .accounts({ trader: this.signer.publicKey, agent: a.publicKey, agentVault: agentVaultPda(a.publicKey), position: p.publicKey, positionVault: positionVaultPda(p.publicKey), systemProgram: SYSTEM, custody: custodyPda(p.publicKey) })
       .rpc() as Promise<string>;
   }
 }

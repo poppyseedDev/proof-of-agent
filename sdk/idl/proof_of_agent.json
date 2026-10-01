@@ -8,6 +8,272 @@
   },
   "instructions": [
     {
+      "name": "begin_trading",
+      "discriminator": [
+        197,
+        45,
+        227,
+        187,
+        41,
+        200,
+        29,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "The bound trading key or the operator. Pays the rent of the custody",
+            "account and of the vault's wSOL account, and gets it back at settlement."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "custody",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "vault_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "position_vault"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wsol_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_position",
       "discriminator": [
         238,
@@ -273,6 +539,208 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "custody",
+          "docs": [
+            "trade under vault custody, which cannot default: the principal is in",
+            "the vault, so the trader unwinds and settles instead."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_vault_token_account",
+      "discriminator": [
+        124,
+        142,
+        69,
+        139,
+        94,
+        176,
+        190,
+        56
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "position_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
         }
       ],
       "args": []
@@ -490,6 +958,9 @@
     },
     {
       "name": "draw_funds",
+      "docs": [
+        "Disabled since vault custody; see `begin_trading`."
+      ],
       "discriminator": [
         147,
         69,
@@ -503,9 +974,6 @@
       "accounts": [
         {
           "name": "executor",
-          "docs": [
-            "The bound trading key or the operator. Receives the principal."
-          ],
           "writable": true,
           "signer": true
         },
@@ -609,10 +1077,6 @@
         },
         {
           "name": "config",
-          "docs": [
-            "Last, so clients built for the previous program version (which had no",
-            "config) keep working against it: a trailing extra account is ignored."
-          ],
           "pda": {
             "seeds": [
               {
@@ -631,6 +1095,314 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "execute_swap",
+      "discriminator": [
+        56,
+        182,
+        124,
+        215,
+        155,
+        140,
+        157,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "The bound trading key or the operator. At or after the deadline, also",
+            "the trader, who may then only swap back into wSOL."
+          ],
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "custody",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "docs": [
+            "The token authority of every vault token account. Signs the DEX call."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint_in"
+        },
+        {
+          "name": "mint_out"
+        },
+        {
+          "name": "vault_in",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "position_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program_in"
+              },
+              {
+                "kind": "account",
+                "path": "mint_in"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_out",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "position_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program_out"
+              },
+              {
+                "kind": "account",
+                "path": "mint_out"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "price_in"
+        },
+        {
+          "name": "price_out"
+        },
+        {
+          "name": "dex_program"
+        },
+        {
+          "name": "token_program_in"
+        },
+        {
+          "name": "token_program_out"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_max",
+          "type": "u64"
+        },
+        {
+          "name": "min_out",
+          "type": "u64"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
     },
     {
       "name": "init_config",
@@ -917,6 +1689,189 @@
           "type": "i64"
         }
       ]
+    },
+    {
+      "name": "open_vault_token_account",
+      "discriminator": [
+        128,
+        187,
+        137,
+        73,
+        216,
+        125,
+        229,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.operator",
+                "account": "Agent"
+              },
+              {
+                "kind": "account",
+                "path": "agent.agent_id",
+                "account": "Agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              },
+              {
+                "kind": "account",
+                "path": "position.trader",
+                "account": "Position"
+              },
+              {
+                "kind": "account",
+                "path": "position.nonce",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "position_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "publish_agent",
@@ -1336,6 +2291,159 @@
       ]
     },
     {
+      "name": "set_trading_config",
+      "discriminator": [
+        242,
+        181,
+        241,
+        133,
+        59,
+        95,
+        58,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  46,
+                  197,
+                  89,
+                  202,
+                  59,
+                  66,
+                  69,
+                  116,
+                  159,
+                  187,
+                  25,
+                  32,
+                  197,
+                  140,
+                  2,
+                  217,
+                  134,
+                  32,
+                  222,
+                  99,
+                  131,
+                  144,
+                  102,
+                  204,
+                  33,
+                  3,
+                  6,
+                  176,
+                  213,
+                  104,
+                  142,
+                  231
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2,
+                168,
+                246,
+                145,
+                78,
+                136,
+                161,
+                176,
+                226,
+                16,
+                21,
+                62,
+                247,
+                99,
+                174,
+                43,
+                0,
+                194,
+                185,
+                61,
+                22,
+                193,
+                36,
+                210,
+                192,
+                83,
+                122,
+                16,
+                4,
+                128,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "allowed_dex_programs",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "oracle_program",
+          "type": "pubkey"
+        },
+        {
+          "name": "max_price_age_secs",
+          "type": "i64"
+        },
+        {
+          "name": "max_swap_deviation_bps",
+          "type": "u16"
+        },
+        {
+          "name": "late_penalty_bps",
+          "type": "u16"
+        },
+        {
+          "name": "feeds",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "FeedMapping"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "settle_position",
       "discriminator": [
         33,
@@ -1351,7 +2459,9 @@
         {
           "name": "executor",
           "docs": [
-            "The bound trading key or the operator. Sends the returned SOL."
+            "The bound trading key or the operator (or, for a custody position at",
+            "or after the deadline, the trader). On the legacy path, sends the",
+            "returned SOL."
           ],
           "writable": true,
           "signer": true
@@ -1492,6 +2602,58 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "custody",
+          "docs": [
+            "position that trades under vault custody and is empty otherwise."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_wsol",
+          "docs": [
+            "The vault's wSOL account. Required for a custody position."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "optional": true,
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The protocol config, for the late penalty. Required for a custody position."
+          ],
+          "optional": true
         }
       ],
       "args": [
@@ -1687,6 +2849,19 @@
       ]
     },
     {
+      "name": "Custody",
+      "discriminator": [
+        67,
+        65,
+        99,
+        117,
+        115,
+        116,
+        100,
+        121
+      ]
+    },
+    {
       "name": "Position",
       "discriminator": [
         67,
@@ -1843,6 +3018,32 @@
         101,
         121
       ]
+    },
+    {
+      "name": "SwapExecuted",
+      "discriminator": [
+        150,
+        166,
+        26,
+        225,
+        28,
+        89,
+        38,
+        79
+      ]
+    },
+    {
+      "name": "TradingConfigChanged",
+      "discriminator": [
+        157,
+        49,
+        239,
+        193,
+        148,
+        126,
+        198,
+        43
+      ]
     }
   ],
   "errors": [
@@ -1990,6 +3191,116 @@
       "code": 6028,
       "name": "InvalidCaps",
       "msg": "Caps must be greater than zero"
+    },
+    {
+      "code": 6029,
+      "name": "DrawDisabled",
+      "msg": "draw_funds is disabled: start trading with begin_trading, which keeps the principal in the vault"
+    },
+    {
+      "code": 6030,
+      "name": "UseSettle",
+      "msg": "This position holds its principal in the vault: unwind it with execute_swap and settle it instead of claiming a default"
+    },
+    {
+      "code": 6031,
+      "name": "DexNotAllowed",
+      "msg": "This DEX program is not on the protocol's allowlist"
+    },
+    {
+      "code": 6032,
+      "name": "MintNotAllowed",
+      "msg": "Mint is neither wrapped SOL nor one of the agent's allowed assets"
+    },
+    {
+      "code": 6033,
+      "name": "VaultNotUnwound",
+      "msg": "The vault still holds tokens other than wrapped SOL; swap them back before settling"
+    },
+    {
+      "code": 6034,
+      "name": "SwapTooMuchIn",
+      "msg": "The swap took more of the input token than amount_in_max"
+    },
+    {
+      "code": 6035,
+      "name": "SwapTooLittleOut",
+      "msg": "The swap returned less than min_out"
+    },
+    {
+      "code": 6036,
+      "name": "SwapBelowOracle",
+      "msg": "The swap returned less than the oracle value allows after the maximum deviation"
+    },
+    {
+      "code": 6037,
+      "name": "OracleAccountInvalid",
+      "msg": "Price update account is not owned by the oracle program or has the wrong layout"
+    },
+    {
+      "code": 6038,
+      "name": "OracleFeedMismatch",
+      "msg": "Price update is for a different feed than the config maps this mint to"
+    },
+    {
+      "code": 6039,
+      "name": "OraclePriceStale",
+      "msg": "Price update is older than the protocol allows"
+    },
+    {
+      "code": 6040,
+      "name": "OracleNotVerified",
+      "msg": "Price update is not fully verified"
+    },
+    {
+      "code": 6041,
+      "name": "OraclePriceInvalid",
+      "msg": "Oracle price is zero or negative"
+    },
+    {
+      "code": 6042,
+      "name": "VaultAccountTampered",
+      "msg": "A vault account was changed by the swap in a way that is not a balance change"
+    },
+    {
+      "code": 6043,
+      "name": "ExtraVaultAccount",
+      "msg": "The swap instruction references a vault token account other than vault_in and vault_out"
+    },
+    {
+      "code": 6044,
+      "name": "SameMint",
+      "msg": "Input and output mints must differ"
+    },
+    {
+      "code": 6045,
+      "name": "TokenAccountNotEmpty",
+      "msg": "Token account still holds a balance"
+    },
+    {
+      "code": 6046,
+      "name": "InvalidTradingConfig",
+      "msg": "Trading config is invalid"
+    },
+    {
+      "code": 6047,
+      "name": "AfterDeadlineOnlyUnwind",
+      "msg": "After the deadline a position may only be swapped back into wrapped SOL"
+    },
+    {
+      "code": 6048,
+      "name": "NoFeedForMint",
+      "msg": "No price feed is configured for this mint"
+    },
+    {
+      "code": 6049,
+      "name": "WsolAccountInUse",
+      "msg": "The wrapped SOL account cannot be closed while the position is trading"
+    },
+    {
+      "code": 6050,
+      "name": "CustodyAccountsMissing",
+      "msg": "Custody accounts are missing: pass custody, vault_wsol, rent_payer and token_program"
     }
   ],
   "types": [
@@ -2367,6 +3678,57 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "allowed_dex_programs",
+            "docs": [
+              "Programs `execute_swap` may call. Empty means no position can trade."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "oracle_program",
+            "docs": [
+              "Owner every price update account must have (the Pyth receiver program)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "max_price_age_secs",
+            "docs": [
+              "Oldest publish time a swap may be priced with, in seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "max_swap_deviation_bps",
+            "docs": [
+              "Largest loss of oracle value one swap may take, in bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "late_penalty_bps",
+            "docs": [
+              "Share of the locked bond paid to the trader when a custody position",
+              "settles at or after its deadline, in bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "feeds",
+            "docs": [
+              "Which oracle feed prices which mint. A mint without a feed cannot be traded."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeedMapping"
+                }
+              }
+            }
           }
         ]
       }
@@ -2395,6 +3757,48 @@
       }
     },
     {
+      "name": "Custody",
+      "docs": [
+        "Created when a position begins trading under vault custody and closed when",
+        "it settles. Its existence is what tells the program a position's principal",
+        "is in the vault rather than in the trading wallet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Paid the rent of this account and of the vault's wrapped SOL account;",
+              "gets both back at settlement."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "held_mask",
+            "docs": [
+              "Bit `i` is set while the vault's token account for",
+              "`agent.terms.allowed_assets[i]` holds a non-zero balance. Wrapped SOL",
+              "is the base asset and never in the mask."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "swaps",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutorBound",
       "type": {
         "kind": "struct",
@@ -2406,6 +3810,30 @@
           {
             "name": "executor",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeedMapping",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "feed_id",
+            "docs": [
+              "Pyth feed id (32 bytes)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -2684,6 +4112,101 @@
           }
         ]
       }
+    },
+    {
+      "name": "SwapExecuted",
+      "docs": [
+        "A custody position swapped between two of its vault token accounts.",
+        "`value_in` and `value_out` are the oracle values of the two legs, in the",
+        "output mint's units scaled to the same exponent, so their ratio is the",
+        "price the swap got relative to the oracle."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "dex_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "value_in",
+            "type": "u128"
+          },
+          {
+            "name": "value_out",
+            "type": "u128"
+          },
+          {
+            "name": "held_mask",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradingConfigChanged",
+      "docs": [
+        "The upgrade authority changed what custody positions may trade."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowed_dex_programs",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "oracle_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_price_age_secs",
+            "type": "i64"
+          },
+          {
+            "name": "max_swap_deviation_bps",
+            "type": "u16"
+          },
+          {
+            "name": "late_penalty_bps",
+            "type": "u16"
+          },
+          {
+            "name": "feed_count",
+            "type": "u8"
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -2701,6 +4224,11 @@
       "name": "CONFIG_SEED",
       "type": "bytes",
       "value": "[99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "CUSTODY_SEED",
+      "type": "bytes",
+      "value": "[99, 117, 115, 116, 111, 100, 121]"
     },
     {
       "name": "FEE_CAP_DIVISOR",

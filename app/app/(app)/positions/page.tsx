@@ -19,6 +19,13 @@ export default function Positions() {
   const { agents } = useAgents();
   const actions = useActions();
   const now = Math.floor(Date.now() / 1000);
+  /** Past the deadline: a custody position is settled from its vault; one drawn before custody claims the bond. */
+  const settleOrClaim = async (p: PositionAccount) => {
+    const agent = agents.find((a) => a.publicKey.equals(p.agent));
+    if (!agent) throw new Error("agent not loaded yet");
+    const custody = await actions.custodyOf(p);
+    return custody ? actions.settleLate(agent, p) : actions.claimDefault(p);
+  };
   const agentName = (k: PositionAccount["agent"]) =>
     agents.find((a) => a.publicKey.equals(k))?.name ?? short(k);
 
@@ -166,10 +173,10 @@ export default function Positions() {
                       <button
                         className="btn seal sm"
                         disabled={!expired}
-                        title={expired ? "Deadline passed: claim the locked collateral" : "Available after the deadline"}
-                        onClick={() => actions.claimDefault(p).then(refresh).catch(() => {})}
+                        title={expired ? "Deadline passed: settle the position from its vault, with the late penalty from the agent's bond" : "Available after the deadline"}
+                        onClick={() => settleOrClaim(p).then(refresh).catch(() => {})}
                       >
-                        {expired ? "Claim collateral" : "Awaiting settlement"}
+                        {expired ? "Settle late" : "Awaiting settlement"}
                       </button>
                     )}
                   </td>

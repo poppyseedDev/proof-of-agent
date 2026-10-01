@@ -55,7 +55,7 @@ export class FakeChain {
         const p = this.positions.find((x) => x.publicKey.equals(key));
         return p && this.lagStatus ? { ...p, status: this.lagStatus } : p ?? null;
       },
-      drawFunds: async (_agent: PublicKey, position: PublicKey) => {
+      beginTrading: async (_agent: PublicKey, position: PublicKey) => {
         this.drawn.push(position);
         const p = this.positions.find((x) => x.publicKey.equals(position));
         if (p) p.status = "trading";

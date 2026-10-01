@@ -6,8 +6,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import {
-  BN, IDL, PROGRAM_ID, PoaClient, SETTLE_COMPUTE_UNITS, agentPda, agentVaultPda, configPda, loadKeypair, positionPda, positionVaultPda, priorityFeeLamports,
-  sendUntilConfirmed, toBN, type Agent, type Position, type SendConnection,
+  BN, IDL, PROGRAM_ID, PoaClient, SETTLE_COMPUTE_UNITS, agentPda, agentVaultPda, configPda, loadKeypair, positionPda, positionVaultPda, priorityFeeLamports, sendUntilConfirmed, toBN, type Agent, type Position, type SendConnection, custodyPda, WSOL_MINT, ataOf, TOKEN_PROGRAM_ID,
 } from "../src/client.js";
 import { DEAD_RPC, SDK_DIR, position as makePosition, tempDir } from "./helpers.js";
 
@@ -153,6 +152,12 @@ function checkIx(ix: TransactionInstruction, name: string, expected: Record<stri
   assert.equal(ix.keys.length, def.accounts.length, "account count");
   def.accounts.forEach((acc, i) => {
     const key = ix.keys[i];
+    // An optional account the test does not name is left out: the program id stands in, read-only.
+    if ((acc as { optional?: boolean }).optional && !expected[acc.name]) {
+      assert.ok(key.pubkey.equals(PROGRAM_ID), `${acc.name} left out`);
+      assert.ok(!key.isSigner && !key.isWritable, `${acc.name} placeholder flags`);
+      return;
+    }
     const want = acc.address ? new PublicKey(acc.address) : expected[acc.name];
     assert.ok(want, `test gives an expected key for ${acc.name}`);
     assert.ok(key.pubkey.equals(want), `${acc.name}: ${key.pubkey.toBase58()} != ${want.toBase58()}`);
@@ -234,37 +239,72 @@ describe("instruction building", () => {
     assert.equal(args.length, 0);
   });
 
-  test("settlePosition: accounts, flags and the returned amount", async () => {
+  test("beginTrading: accounts, flags and no args", async () => {
+    const { client, signer, only } = captureClient();
+    const agent = Keypair.generate().publicKey;
+    const position = Keypair.generate().publicKey;
+    const vault = positionVaultPda(position);
+    await client.beginTrading(agent, position);
+    const args = checkIx(only(), "begin_trading", {
+      executor: signer.publicKey, agent, position, position_vault: vault, custody: custodyPda(position),
+      wsol_mint: WSOL_MINT, vault_wsol: ataOf(vault, WSOL_MINT), config: configPda(),
+    });
+    assert.equal(args.length, 0);
+  });
+
+  test("settlePosition on a legacy position: accounts, flags and the returned amount", async () => {
     const { client, signer, only } = captureClient();
     const operator = Keypair.generate().publicKey;
     const agentKey = agentPda(operator, 3);
     const a = { publicKey: agentKey, operator } as Agent;
     const p: Position = makePosition({ status: "trading", agent: agentKey });
-    await client.settlePosition(a, p, 1_234_567_890_123n);
-    const args = checkIx(only(), "settle_position", {
+    await client.settlePosition(a, p, 1_234_567_890_123n, null);
+    const ix = only();
+    const args = checkIx(ix, "settle_position", {
       executor: signer.publicKey, operator, agent: agentKey, agent_vault: agentVaultPda(agentKey),
-      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader,
+      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader, custody: custodyPda(p.publicKey),
     });
     assert.equal(args.length, 8);
     assert.equal(args.readBigUInt64LE(0), 1_234_567_890_123n);
+    // The optional custody accounts are left out: the program id stands in for each.
+    const names = idlIx("settle_position").accounts.map((x) => x.name);
+    for (const name of ["vault_wsol", "rent_payer", "token_program", "config"]) {
+      assert.ok(ix.keys[names.indexOf(name)].pubkey.equals(PROGRAM_ID), name);
+    }
+  });
+
+  test("settlePosition on a custody position: the vault's wSOL, the rent payer and the config go along, returned is 0", async () => {
+    const { client, signer, only } = captureClient();
+    const operator = Keypair.generate().publicKey;
+    const a = { publicKey: agentPda(operator, 3), operator } as Agent;
+    const p: Position = makePosition({ status: "trading", agent: a.publicKey });
+    const vault = positionVaultPda(p.publicKey);
+    const custody = { position: p.publicKey, rentPayer: Keypair.generate().publicKey, heldMask: 0, swaps: 2 };
+    await client.settlePosition(a, p, 999n, custody);
+    const args = checkIx(only(), "settle_position", {
+      executor: signer.publicKey, operator, agent: a.publicKey, agent_vault: agentVaultPda(a.publicKey),
+      position: p.publicKey, position_vault: vault, trader: p.trader, custody: custodyPda(p.publicKey),
+      vault_wsol: ataOf(vault, WSOL_MINT), rent_payer: custody.rentPayer, token_program: TOKEN_PROGRAM_ID, config: configPda(),
+    });
+    assert.equal(args.readBigUInt64LE(0), 0n, "the vault settles the position, not the argument");
   });
 
   test("settlePosition encodes 0 and u64::MAX, and refuses a negative BN", async () => {
     const { client, only } = captureClient();
     const a = { publicKey: Keypair.generate().publicKey, operator: Keypair.generate().publicKey } as Agent;
     const p = makePosition({ status: "trading" });
-    await client.settlePosition(a, p, 0);
+    await client.settlePosition(a, p, 0, null);
     assert.equal(checkIx(only(), "settle_position", {
       executor: client.signer.publicKey, operator: a.operator, agent: a.publicKey, agent_vault: agentVaultPda(a.publicKey),
-      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader,
+      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader, custody: custodyPda(p.publicKey),
     }).readBigUInt64LE(0), 0n);
-    await client.settlePosition(a, p, U64_MAX);
+    await client.settlePosition(a, p, U64_MAX, null);
     assert.equal(only().data.readBigUInt64LE(8), U64_MAX);
-    assert.throws(() => client.settlePosition(a, p, new BN(-5)), /must not be negative/);
+    await assert.rejects(client.settlePosition(a, p, new BN(-5), null), /must not be negative/);
   });
 
   test("the system program account is the real one", () => {
-    for (const name of ["open_position", "cancel_position", "draw_funds", "settle_position"]) {
+    for (const name of ["open_position", "cancel_position", "draw_funds", "begin_trading", "settle_position"]) {
       const sys = idlIx(name).accounts.find((a) => a.name === "system_program")!;
       assert.equal(sys.address, SystemProgram.programId.toBase58());
     }
@@ -429,7 +469,7 @@ describe("PoaClient.settle", () => {
     const operator = Keypair.generate().publicKey;
     const a = { publicKey: agentPda(operator, 1), operator } as Agent;
     const p = makePosition({ status: "trading", agent: a.publicKey });
-    const sent = await client.settle(a, p, 1_500_000_000n, { microLamports: 25_000 }, { sleep: async () => {} });
+    const sent = await client.settle(a, p, 1_500_000_000n, { microLamports: 25_000 }, { sleep: async () => {} }, null);
     assert.equal(sent.slot, 12);
     const tx = Transaction.from(Buffer.from(c.sends[0].raw, "base64"));
     assert.ok(tx.feePayer!.equals(client.signer.publicKey));
@@ -440,7 +480,7 @@ describe("PoaClient.settle", () => {
     assert.equal(tx.instructions[1].data.readBigUInt64LE(1), 25_000n, "SetComputeUnitPrice");
     const args = checkIx(tx.instructions[2], "settle_position", {
       executor: client.signer.publicKey, operator, agent: a.publicKey, agent_vault: agentVaultPda(a.publicKey),
-      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader,
+      position: p.publicKey, position_vault: positionVaultPda(p.publicKey), trader: p.trader, custody: custodyPda(p.publicKey),
     });
     assert.equal(args.readBigUInt64LE(0), 1_500_000_000n);
   });
@@ -449,7 +489,7 @@ describe("PoaClient.settle", () => {
     const client = new PoaClient(DEAD_RPC, Keypair.generate());
     const c = new FakeCluster();
     Object.assign(client, { connection: c.conn() });
-    await assert.rejects(client.settle({ publicKey: PublicKey.unique(), operator: PublicKey.unique() } as Agent, makePosition({ status: "trading" }), -1n, { microLamports: 1 }), /must not be negative/);
+    await assert.rejects(client.settle({ publicKey: PublicKey.unique(), operator: PublicKey.unique() } as Agent, makePosition({ status: "trading" }), -1n, { microLamports: 1 }, {}, null), /must not be negative/);
     assert.equal(c.sends.length, 0);
   });
 

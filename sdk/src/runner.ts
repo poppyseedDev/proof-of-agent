@@ -463,7 +463,7 @@ export class Runner {
    */
   private async draw(p: Position, before: bigint) {
     const deadline = p.deadline.toNumber();
-    const sig = await this.client.drawFunds(this.opts.agent, p.publicKey);
+    const sig = await this.client.beginTrading(this.opts.agent, p.publicKey);
     const drawnAt = this.now();
     const balanceAtDraw = before + BigInt(p.principal.toString()) - DRAW_TX_FEE;
     const book: Book = { position: p.publicKey.toBase58(), principal: p.principal.toString(), balanceAtDraw: String(balanceAtDraw), drawnAt, settleAt: this.settleTime(drawnAt, deadline), deadline };

@@ -25,7 +25,45 @@ function programFor(connection: Connection, admin: Keypair): any {
   return new Program(idl as Idl, new AnchorProvider(connection, new Wallet(admin), { commitment: "confirmed" }));
 }
 
-export type ConfigState = { paused: boolean; maxPosition: BN; maxAgentCapital: BN };
+export type FeedMapping = { mint: PublicKey; feedId: number[] };
+export type TradingConfig = {
+  allowedDexPrograms: PublicKey[];
+  oracleProgram: PublicKey;
+  maxPriceAgeSecs: BN;
+  maxSwapDeviationBps: number;
+  latePenaltyBps: number;
+  feeds: FeedMapping[];
+};
+export type ConfigState = { paused: boolean; maxPosition: BN; maxAgentCapital: BN } & TradingConfig;
+
+/** Well-known programs and Pyth feeds, the same ids on devnet and mainnet. */
+export const ORCA_WHIRLPOOL_PROGRAM = new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+export const PYTH_RECEIVER_PROGRAM = new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
+export const PYTH_FEEDS: Record<string, string> = {
+  "SOL/USD": "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
+  "USDC/USD": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+};
+export const MINTS = {
+  SOL: new PublicKey("So11111111111111111111111111111111111111112"),
+  USDC: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+  DEVUSDC: new PublicKey("BRjpCHtyQLNCo8gqRUr8jtdAj5AjPYQaoqbvcZiHok1k"),
+};
+export const feedId = (hex: string) => Array.from(Buffer.from(hex.replace(/^0x/, ""), "hex"));
+/** The trading config this deployment starts with: Orca, Pyth, SOL and USDC (real and devnet) priced by their USD feeds. */
+export function defaultTradingConfig(maxSwapDeviationBps: number, latePenaltyBps: number, maxPriceAgeSecs = 60): TradingConfig {
+  return {
+    allowedDexPrograms: [ORCA_WHIRLPOOL_PROGRAM],
+    oracleProgram: PYTH_RECEIVER_PROGRAM,
+    maxPriceAgeSecs: new BN(maxPriceAgeSecs),
+    maxSwapDeviationBps,
+    latePenaltyBps,
+    feeds: [
+      { mint: MINTS.SOL, feedId: feedId(PYTH_FEEDS["SOL/USD"]) },
+      { mint: MINTS.USDC, feedId: feedId(PYTH_FEEDS["USDC/USD"]) },
+      { mint: MINTS.DEVUSDC, feedId: feedId(PYTH_FEEDS["USDC/USD"]) },
+    ],
+  };
+}
 
 /** The current config, or null if the admin has not created it yet. */
 export async function readConfig(connection: Connection): Promise<ConfigState | null> {
@@ -46,6 +84,13 @@ export async function setPaused(connection: Connection, admin: Keypair, paused: 
 
 export async function setCaps(connection: Connection, admin: Keypair, maxPosition: BN, maxAgentCapital: BN) {
   return programFor(connection, admin).methods.setCaps(maxPosition, maxAgentCapital).accounts({ admin: admin.publicKey }).rpc();
+}
+
+export async function setTradingConfig(connection: Connection, admin: Keypair, t: TradingConfig) {
+  return programFor(connection, admin).methods
+    .setTradingConfig(t.allowedDexPrograms, t.oracleProgram, t.maxPriceAgeSecs, t.maxSwapDeviationBps, t.latePenaltyBps, t.feeds)
+    .accounts({ admin: admin.publicKey })
+    .rpc();
 }
 
 /** Creates the config with no caps if it does not exist yet. For localnet. */

@@ -431,8 +431,8 @@ function LivePositions({ agent, positions, me, actions, busy, done }: { agent: A
                     {p.status === "open" && (
                       <div className="actions" style={{ marginTop: 0, justifyContent: "flex-end" }}>
                         <button className="btn sm" disabled={busy || late || !canExecute}
-                          title={late ? "The deadline has passed. Decline to refund the trader." : "Move the principal to your trading key"}
-                          onClick={() => actions.drawFunds(p).then(done).catch(() => {})}>Draw</button>
+                          title={late ? "The deadline has passed. Decline to refund the trader." : "Wrap the principal in the position's vault and start trading it through the program"}
+                          onClick={() => actions.beginTrading(p).then(done).catch(() => {})}>Start trading</button>
                         <button className="btn ghost sm" disabled={busy || !canExecute}
                           title="Refund the trader in full. No fee, no breach."
                           onClick={() => actions.settlePosition(agent, p, 0).then(done).catch(() => {})}>Decline &amp; refund</button>
@@ -440,12 +440,14 @@ function LivePositions({ agent, positions, me, actions, busy, done }: { agent: A
                     )}
                     {p.status === "trading" && (
                       <div className="actions" style={{ marginTop: 0, justifyContent: "flex-end" }}>
-                        <input type="number" min={0} step={0.01} placeholder="SOL to return" value={ret[key] ?? ""}
-                          onChange={(e) => setRet({ ...ret, [key]: e.target.value })} style={{ width: 130 }} />
-                        <button className="btn sm" disabled={busy || !canExecute || parseNonNegativeSolInput(ret[key] ?? "") === null}
+                        <input type="number" min={0} step={0.01} placeholder="SOL to return (legacy only)" value={ret[key] ?? ""}
+                          title="Only for a position drawn before vault custody. A custody position settles on what its vault holds."
+                          onChange={(e) => setRet({ ...ret, [key]: e.target.value })} style={{ width: 170 }} />
+                        <button className="btn sm" disabled={busy || !canExecute}
+                          title="Settles on the vault's wSOL balance. Everything else in the vault must be swapped back to SOL first."
                           onClick={() => {
-                            const returned = parseNonNegativeSolInput(ret[key] ?? "");
-                            if (returned !== null) actions.settlePosition(agent, p, returned).then(done).catch(() => {});
+                            const returned = parseNonNegativeSolInput(ret[key] ?? "") ?? 0;
+                            actions.settlePosition(agent, p, returned).then(done).catch(() => {});
                           }}>Settle</button>
                       </div>
                     )}
